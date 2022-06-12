@@ -24,7 +24,7 @@ mod types;
 
 fn main() {
     let cwd = env::current_dir().unwrap();
-    let mut entries = dir_entries(cwd.clone());
+    let mut entries = dir_entries(&cwd);
     let defaultSortOrder = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
     sort_entries(&mut entries);
 
@@ -72,6 +72,10 @@ impl Model for AppModel {
                 match keyevent.code {
                     KeyCode::Char('k') => self.nav_up(),
                     KeyCode::Char('j') => self.nav_down(),
+                    KeyCode::Enter => match &self.focused_entry {
+                        Some(entry) => self.forward_dir(entry.path.clone()),
+                        None => (),
+                    },
                     _ => (),
                 };
             },
@@ -138,7 +142,6 @@ impl Model for AppModel {
                 cursor::MoveTo(1, lineno),
             );
 
-            // let is_focused = self.curr_entry_ref() == Some(entry);
             let is_focused = self.focused_entry.as_ref() == Some(entry);
             if is_focused {
                 queue!(buf, SetBackgroundColor(Color::DarkGrey));
@@ -167,6 +170,22 @@ impl AppModel {
 
     fn curr_entry_ref(&self) -> Option<&Entry> {
         return self.focused_entry.as_ref();
+    }
+
+    fn forward_dir(&mut self, p: PathBuf) {
+        let mut entries = dir_entries(&p);
+        let defaultSortOrder = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
+        sort_entries(&mut entries);
+
+        let focused_entry = match entries.len() {
+            0 => None,
+            _ => Some(entries[0].clone()),
+        };
+        
+        self.cwd = p;
+        self.entries = entries;
+        self.focused_entry = focused_entry;
+        self.sortOrder = defaultSortOrder;
     }
 
     fn nav_up(&mut self) {
@@ -207,7 +226,7 @@ fn str_width<S: AsRef<str>> (s: S) -> usize {
     return s.as_ref().chars().count();
 }
 
-fn dir_entries(dir: PathBuf) -> Vec<Entry> {
+fn dir_entries(dir: &PathBuf) -> Vec<Entry> {
     let mut entries = Vec::<Entry>::new();
 
     for entry in dir.read_dir().unwrap() {
@@ -228,6 +247,5 @@ fn sort_entries(entries: &mut Vec<Entry>) {
         }
         return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
     });
-
 }
 
