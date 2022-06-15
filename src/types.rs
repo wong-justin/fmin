@@ -9,6 +9,14 @@ pub enum FileProperty {
     Modified(Option<String>),
 }
 
+/*
+pub type FileName = String;
+pub type FileSize = u64;  // num bytes returned by path.metadata.len
+pub type FileDate = String;
+
+pub type SortOrder<T> = bool;
+*/
+
 pub struct SortOrder {
     pub property: FileProperty,
     pub ascending: bool,
@@ -22,6 +30,14 @@ pub struct Entry {
     pub size: FileProperty,
     pub modified: FileProperty,
 }
+
+pub struct Layout {
+    pub W: usize,
+    pub H: usize,
+    pub list_min_pos: usize,
+    pub list_max_pos: usize,
+}
+
 
 impl std::convert::From<DirEntry> for Entry {
     fn from(de: DirEntry) -> Self {
@@ -62,3 +78,45 @@ impl std::fmt::Display for FileProperty {
     }
 }
 
+/*
+impl FileProperty {
+    fn cmp(&self, other: Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Name(a), Self::Name(b)) => {
+                if a.is_dir && !b.is_dir {
+                    return Ordering::Less;
+                }
+                if !a.is_dir && b.is_dir {
+                    return Ordering::Greater;
+                }
+                return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
+         
+            },
+        }
+
+    }
+}
+*/
+
+impl Layout {
+
+    pub fn empty() -> Self {
+        Self {
+            W: 0,
+            H: 0,
+            list_min_pos: 0,
+            list_max_pos: 0,
+        }
+    }
+
+    pub fn resize(&mut self, w: u16, h: u16) {
+        self.W = w as usize;
+        self.H = h as usize;
+        self.list_max_pos = self.H - 6 + self.list_min_pos;
+    }
+
+    pub fn reset_list_pos(&mut self) {
+        self.list_min_pos = 0;
+        self.list_max_pos = self.H - 6
+    }
+}

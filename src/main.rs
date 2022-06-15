@@ -17,47 +17,29 @@ use crossterm::{
 };
 
 use crate::tuimodel::{Model, start_event_loop};
-use crate::types::{Entry, FileProperty, SortOrder,};
+use crate::types::{Entry, FileProperty, SortOrder, Layout,};
 
 mod tuimodel;
 mod types;
 
 fn main() {
     let cwd = env::current_dir().unwrap();
-    let mut entries = dir_entries(&cwd);
-    let defaultSortOrder = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
-    sort_entries(&mut entries);
 
-    let focused_entry = Some(entries[0].clone());
-    // let focused_entry = entries.get(0);
-
-    start_event_loop(AppModel{
-        cwd: cwd, 
-        entries: entries,
-        focused_entry: focused_entry,
-        sortOrder: defaultSortOrder,
-        lastKey: " ".into(),
-        lastModifier: " ".into(),
-    });
+    start_event_loop(AppModel::new(cwd));
 }
-
-fn into_name_str(p: &Entry) -> String {
-    return p.name.to_string();
-    // let osstr = p.file_name().unwrap();
-    // return osstr.to_str().unwrap_or("").to_string();
-}
-
 
 struct AppModel {
     cwd: PathBuf,
+    // sorted according to sort_order
     entries: Vec<Entry>, 
     // focusedEntry could be None at any time.
     // Also would be more efficient to store only a ref,
     // but that requires marking lifetimes which is too advanced for me
     focused_entry: Option<Entry>,
-    sortOrder: SortOrder,
-    lastKey: String,
-    lastModifier: String,
+    sort_order: SortOrder, 
+    // lastKey: String,
+    // lastModifier: String,
+    layout: Layout,
 }
 
 impl Model for AppModel {
@@ -65,38 +47,34 @@ impl Model for AppModel {
     fn update(&mut self, ev : Event) -> Option<()> { 
         match ev {
             Event::Key(keyevent) => {
-                self.lastKey = format!("{:?}", keyevent.code);
-                if keyevent.code == KeyCode::Esc || keyevent.code == KeyCode::Char('q') {
-                    return None;
-                }
                 match keyevent.code {
                     KeyCode::Char('k') => self.nav_up(),
                     KeyCode::Char('j') => self.nav_down(),
-                    KeyCode::Enter => match &self.focused_entry {
-                        Some(entry) => self.forward_dir(entry.path.clone()),
-                        None => (),
+                    KeyCode::Enter => if let Some(entry) = &self.focused_entry  {
+                        if entry.is_dir {
+                            self.forward_dir(entry.path.clone())
+                        }
+                        else {
+                            
+                        }
                     },
+                    KeyCode::Backspace => self.back_dir(),
+                    KeyCode::Esc | KeyCode::Char('q') => return None,
                     _ => (),
                 };
             },
-            Event::Resize(cols, rows) => {
-            },
+            Event::Resize(w, h) => self.layout.resize(w, h),
             _ => (),
         }
         return Some(());
     }
-    /*
-    Tdown = "┬";
-    Tup = "┴";
-    Vbar = "│";
-    Hbar = "─";
-    */
+    
+    // ┬ ┴ │ ─
 
     fn view(&self, buf: &mut impl Write) {
-        let (w, h) = terminal::size().unwrap();
         // crossterm returns u16, but all other math in view() defaults
         // to usize, so just change it here
-        let (w, h) = (w as usize, h as usize);
+        let (w, h) = (self.layout.W as usize, self.layout.H as usize);  // (w as usize, h as usize);
         let divider : String = "=".repeat((w - 2).into());
         let top_divider_2 = "─┬────────┬────────────";
         let labels2 =       " │ Size   │ Modified   ";
@@ -123,7 +101,9 @@ impl Model for AppModel {
             Print(&bot_divider),
         );
         let mut lineno = 5;
-        for entry in &self.entries { 
+        for entry in self.viewable_entries().iter() {
+//        for entry in &self.entries[self.layout.list_min_pos..self.layout.list_max_pos] {
+
             let child_filename = entry.name.to_string();
 
             // chars.count is num unicode points
@@ -156,24 +136,30 @@ impl Model for AppModel {
             );
             lineno += 1;
         }
+        /*
+        let divider = "─".repeat(w - 2);
+        queue!(
+            buf,
+            cursor::MoveTo(1, (h as u16) - 2),
+            Print(divider),
+        );
+        */
         
+        /*
         queue!(
             buf,
             cursor::MoveTo(10,10),
             Print(&self.lastKey),
             Print(format!("{} {}", w, h)),
         ).unwrap();
+        */
     }
 }
 
 impl AppModel {
 
-    fn curr_entry_ref(&self) -> Option<&Entry> {
-        return self.focused_entry.as_ref();
-    }
-
-    fn forward_dir(&mut self, p: PathBuf) {
-        let mut entries = dir_entries(&p);
+    fn cd_into(&mut self, dir: PathBuf) {
+        let mut entries = dir_entries(&dir);
         let defaultSortOrder = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
         sort_entries(&mut entries);
 
@@ -182,44 +168,83 @@ impl AppModel {
             _ => Some(entries[0].clone()),
         };
         
-        self.cwd = p;
+        self.cwd = dir;
         self.entries = entries;
         self.focused_entry = focused_entry;
-        self.sortOrder = defaultSortOrder;
+        self.sort_order = defaultSortOrder;
+        self.layout.reset_list_pos();
+    }
+
+    fn new(dir: PathBuf) -> Self {
+        let mut entries = dir_entries(&dir);
+        let default_sort_order = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
+        sort_entries(&mut entries);
+
+        let focused_entry = match entries.len() {
+            0 => None,
+            _ => Some(entries[0].clone()),
+        };
+
+        let (w, h) = terminal::size().unwrap();
+        let mut layout = Layout::empty();
+        layout.resize(w, h);
+
+        Self {
+            cwd: dir,
+            entries: entries,
+            focused_entry: focused_entry,
+            sort_order: default_sort_order,
+            layout: layout,
+        }
+    }
+
+    fn viewable_entries(&self) -> &[Entry] {
+        let begin = self.layout.list_min_pos;
+        let end = std::cmp::min( self.layout.list_max_pos + 1, self.entries.len() );
+
+        return &self.entries[begin..end];
+    }
+
+    fn forward_dir(&mut self, p: PathBuf) {
+        self.cd_into(p);
+    }
+
+    fn back_dir(&mut self) {
+        let parent = match self.cwd.parent() {
+            Some(path) => path.to_owned(),
+            None => return,
+        };
+        self.cd_into(parent);
     }
 
     fn nav_up(&mut self) {
-        /*
-        let e = match &self.focused_entry {
-            Some(entry) => entry,
-            None => return,
-        };
-        */
-        // let e = self.focused_entry.unwrap_or_else(|| return);
-        let e : &Entry = match &self.focused_entry {
-            Some(e) => e,
-            None => return
-        };
-
-        let i = self.entries.iter().position(|x| x == e).unwrap();
-        if i == 0 {
-            return;
+        if let Some(i) = self._focused_entry_pos() {
+            if i == 0 {
+                return;
+            }
+            self.focused_entry = Some(self.entries[i-1].clone());
         }
-        self.focused_entry = Some(self.entries[i-1].clone());
     }
 
     fn nav_down(&mut self) {
-        let e = match &self.focused_entry {
+        if let Some(i) = self._focused_entry_pos() {
+            if i == self.entries.len()-1 {
+                return;
+            }
+            self.focused_entry = Some(self.entries[i+1].clone());
+        }
+    }
+
+    fn _focused_entry_pos(&self) -> Option<usize> {
+        let e: &Entry = match &self.focused_entry {
             Some(e) => e,
-            None => return,
+            None => return None,
         };
 
         let i = self.entries.iter().position(|x| x == e).unwrap();
-        if i == self.entries.len()-1 {
-            return;
-        }
-        self.focused_entry = Some(self.entries[i+1].clone());
+        Some(i)
     }
+
 }
 
 fn str_width<S: AsRef<str>> (s: S) -> usize {
