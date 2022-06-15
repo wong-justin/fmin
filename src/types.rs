@@ -1,12 +1,49 @@
 use std::path::PathBuf;
 use std::collections::HashSet;
 use std::fs::DirEntry;
+use std::marker::PhantomData;
+use std::fmt::{Display, Formatter, Error};
 
+/*
 #[derive(PartialEq, Clone)]
 pub enum FileProperty {
     Name(String),
     Size(Option<f64>),
     Modified(Option<String>),
+}
+*/
+
+#[derive(Clone)]
+pub struct FileSize(u64);
+#[derive(Clone)]
+pub struct FileName(String);
+#[derive(Clone)]
+pub struct FileDate(String);
+
+pub trait FileProperty {}
+
+impl FileProperty for FileSize {}
+impl FileProperty for FileName {}
+impl FileProperty for FileDate {}
+
+pub struct SortOrder<T> where T: FileProperty {
+    phantom: PhantomData<T>,
+    pub ascending: bool,
+}
+
+impl<T> SortOrder<T> where T: FileProperty {
+    fn ascending(b : bool) -> Self {
+        Self {
+            ascending: b,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> Display for SortOrder<T> where T: FileProperty {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}: {}", std::any::type_name::<T>(), self.ascending)
+    }
 }
 
 /*
@@ -17,18 +54,13 @@ pub type FileDate = String;
 pub type SortOrder<T> = bool;
 */
 
-pub struct SortOrder {
-    pub property: FileProperty,
-    pub ascending: bool,
-}
-
-#[derive(PartialEq, Clone)]
+#[derive(Clone)]
 pub struct Entry {
     pub path: PathBuf,
     pub is_dir: bool,
-    pub name: FileProperty,
-    pub size: FileProperty,
-    pub modified: FileProperty,
+    pub name: FileName,
+    pub size: FileSize,
+    pub modified: FileDate,
 }
 
 pub struct Layout {
@@ -58,6 +90,7 @@ impl std::convert::From<DirEntry> for Entry {
     }
 }
 
+/*
 impl std::fmt::Display for FileProperty {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // let emptystr = String::from(""); 
@@ -77,6 +110,7 @@ impl std::fmt::Display for FileProperty {
         write!(f, "{}",  o)
     }
 }
+*/
 
 /*
 impl FileProperty {
