@@ -4,20 +4,11 @@ use std::fs::DirEntry;
 use std::marker::PhantomData;
 use std::fmt::{Display, Formatter, Error};
 
-/*
 #[derive(PartialEq, Clone)]
-pub enum FileProperty {
-    Name(String),
-    Size(Option<f64>),
-    Modified(Option<String>),
-}
-*/
-
-#[derive(Clone)]
 pub struct FileSize(u64);
-#[derive(Clone)]
+#[derive(PartialEq, Clone)]
 pub struct FileName(String);
-#[derive(Clone)]
+#[derive(PartialEq, Clone)]
 pub struct FileDate(String);
 
 pub trait FileProperty {}
@@ -26,40 +17,12 @@ impl FileProperty for FileSize {}
 impl FileProperty for FileName {}
 impl FileProperty for FileDate {}
 
-pub struct SortOrder<T> where T: FileProperty {
-    phantom: PhantomData<T>,
-    pub ascending: bool,
-}
-
-impl<T> SortOrder<T> where T: FileProperty {
-    fn ascending(b : bool) -> Self {
-        Self {
-            ascending: b,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<T> Display for SortOrder<T> where T: FileProperty {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}: {}", std::any::type_name::<T>(), self.ascending)
-    }
-}
-
-/*
-pub type FileName = String;
-pub type FileSize = u64;  // num bytes returned by path.metadata.len
-pub type FileDate = String;
-
-pub type SortOrder<T> = bool;
-*/
-
-#[derive(Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Entry {
     pub path: PathBuf,
     pub is_dir: bool,
     pub name: FileName,
-    pub size: FileSize,
+    pub size: Option<FileSize>,
     pub modified: FileDate,
 }
 
@@ -74,8 +37,13 @@ pub struct Layout {
 impl std::convert::From<DirEntry> for Entry {
     fn from(de: DirEntry) -> Self {
         let p = de.path();
+        let metadata = de.metadata().unwrap();
         let mut name : String = p.file_name().unwrap().to_str().unwrap().to_string();
         let is_dir = p.is_dir();
+        let byte_size = match is_dir {
+            true => Some(FileSize(metadata.len())),
+            false => None,
+        };
         if is_dir {
             name = format!("{}/", name);
         }
@@ -83,9 +51,9 @@ impl std::convert::From<DirEntry> for Entry {
         return Self {
             path: p,
             is_dir: is_dir, 
-            name: FileProperty::Name(name),
-            size: FileProperty::Size(None),
-            modified: FileProperty::Modified(None),
+            name: FileName(name),
+            size: byte_size,
+            modified: FileDate("Jan 1".to_string()),
         };
     }
 }
@@ -154,3 +122,37 @@ impl Layout {
         self.list_max_pos = self.H - 6
     }
 }
+
+impl Display for FileSize {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}B", self.0)
+    }
+}
+
+impl Display for FileName {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub struct SortOrder<T> where T: FileProperty {
+    phantom: PhantomData<T>,
+    pub ascending: bool,
+}
+
+impl<T> SortOrder<T> where T: FileProperty {
+    fn ascending(b : bool) -> Self {
+        Self {
+            ascending: b,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> Display for SortOrder<T> where T: FileProperty {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}: {}", std::any::type_name::<T>(), self.ascending)
+    }
+}
+
+

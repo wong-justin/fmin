@@ -17,7 +17,7 @@ use crossterm::{
 };
 
 use crate::tuimodel::{Model, start_event_loop};
-use crate::types::{Entry, FileProperty, SortOrder, Layout,};
+use crate::types::{Entry, FileProperty, FileSize, FileDate, FileName, SortOrder, Layout,};
 
 mod tuimodel;
 mod types;
@@ -36,7 +36,7 @@ struct AppModel {
     // Also would be more efficient to store only a ref,
     // but that requires marking lifetimes which is too advanced for me
     focused_entry: Option<Entry>,
-    sort_order: SortOrder, 
+    sort_order: SortOrder<T>, 
     // lastKey: String,
     // lastModifier: String,
     layout: Layout,
