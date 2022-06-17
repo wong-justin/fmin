@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::fs::DirEntry;
 use std::marker::PhantomData;
 use std::fmt::{Display, Formatter, Error};
+use std::cmp::Ordering;
 
 #[derive(PartialEq, Clone)]
 pub struct FileSize(u64);
@@ -11,18 +12,26 @@ pub struct FileName(String);
 #[derive(PartialEq, Clone)]
 pub struct FileDate(String);
 
+/*
 pub trait FileProperty {}
 
 impl FileProperty for FileSize {}
 impl FileProperty for FileName {}
 impl FileProperty for FileDate {}
+*/
+
+pub enum FileProperty {
+    Name,
+    Size,
+    Date,
+}
 
 #[derive(PartialEq, Clone)]
 pub struct Entry {
     pub path: PathBuf,
     pub is_dir: bool,
     pub name: FileName,
-    pub size: Option<FileSize>,
+    pub size: FileSize,
     pub modified: FileDate,
 }
 
@@ -40,45 +49,25 @@ impl std::convert::From<DirEntry> for Entry {
         let metadata = de.metadata().unwrap();
         let mut name : String = p.file_name().unwrap().to_str().unwrap().to_string();
         let is_dir = p.is_dir();
+        /*
         let byte_size = match is_dir {
             true => Some(FileSize(metadata.len())),
             false => None,
         };
+        */
         if is_dir {
             name = format!("{}/", name);
         }
-
+        
         return Self {
             path: p,
             is_dir: is_dir, 
             name: FileName(name),
-            size: byte_size,
+            size: FileSize(metadata.len()),
             modified: FileDate("Jan 1".to_string()),
         };
     }
 }
-
-/*
-impl std::fmt::Display for FileProperty {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // let emptystr = String::from(""); 
-        let emptystr = String::new();
-        let o : String = match self {
-            Self::Name(o) => o.clone(),
-            // Self::Name(o) => o.as_deref().unwrap_or(&emptystr).to_string(),
-            Self::Size(o) => match o {
-                Some(n) => n.to_string(),
-                None => emptystr, 
-            },
-            Self::Modified(o) => match o {
-                Some(d) => d.to_string(),
-                None => emptystr,
-            },
-        };
-        write!(f, "{}",  o)
-    }
-}
-*/
 
 /*
 impl FileProperty {
@@ -135,13 +124,43 @@ impl Display for FileName {
     }
 }
 
+pub struct SortOrder {
+    pub fileproperty: FileProperty,
+    pub ascending: bool,
+}
+
+impl SortOrder {
+    pub fn cmp_entries(&self, a: &Entry, b: &Entry) -> Ordering {
+        match &self.fileproperty {
+            FileProperty::Name => {
+                if a.is_dir && !b.is_dir {
+                    return Ordering::Less;
+                }
+                if !a.is_dir && b.is_dir {
+                    return Ordering::Greater;
+                }
+                return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
+            },
+            FileProperty::Size => {
+                match (a.size.0, b.size.0) {
+                    (a,b) if a < b => Ordering::Less, 
+                    (a,b) if a > b => Ordering::Greater,
+                    _ => Ordering::Equal,
+                }
+            }
+            FileProperty::Date => Ordering::Equal,
+        }
+    }
+}
+
+/*
 pub struct SortOrder<T> where T: FileProperty {
     phantom: PhantomData<T>,
     pub ascending: bool,
 }
 
 impl<T> SortOrder<T> where T: FileProperty {
-    fn ascending(b : bool) -> Self {
+    pub fn ascending(b : bool) -> Self {
         Self {
             ascending: b,
             phantom: PhantomData,
@@ -154,5 +173,5 @@ impl<T> Display for SortOrder<T> where T: FileProperty {
         write!(f, "{}: {}", std::any::type_name::<T>(), self.ascending)
     }
 }
-
+*/
 

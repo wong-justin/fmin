@@ -36,7 +36,7 @@ struct AppModel {
     // Also would be more efficient to store only a ref,
     // but that requires marking lifetimes which is too advanced for me
     focused_entry: Option<Entry>,
-    sort_order: SortOrder<T>, 
+    sort_order: SortOrder, 
     // lastKey: String,
     // lastModifier: String,
     layout: Layout,
@@ -156,12 +156,14 @@ impl Model for AppModel {
     }
 }
 
-impl AppModel {
+impl AppModel where {
 
     fn cd_into(&mut self, dir: PathBuf) {
         let mut entries = dir_entries(&dir);
-        let defaultSortOrder = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
-        sort_entries(&mut entries);
+        // let default_sort_order = SortOrder::<FileName>::ascending(true);
+        let default_sort_order = SortOrder{ fileproperty: FileProperty::Size, ascending: true };
+
+        entries.sort_by(|a,b| default_sort_order.cmp_entries(a,b));
 
         let focused_entry = match entries.len() {
             0 => None,
@@ -171,14 +173,15 @@ impl AppModel {
         self.cwd = dir;
         self.entries = entries;
         self.focused_entry = focused_entry;
-        self.sort_order = defaultSortOrder;
         self.layout.reset_list_pos();
     }
 
     fn new(dir: PathBuf) -> Self {
         let mut entries = dir_entries(&dir);
-        let default_sort_order = SortOrder{property: FileProperty::Name("".to_string()), ascending: true};
-        sort_entries(&mut entries);
+        // let default_sort_order = SortOrder::<FileName>::ascending(true);
+        let default_sort_order = SortOrder{ fileproperty: FileProperty::Size, ascending: true };
+
+        entries.sort_by(|a,b| default_sort_order.cmp_entries(a,b));
 
         let focused_entry = match entries.len() {
             0 => None,
@@ -261,16 +264,4 @@ fn dir_entries(dir: &PathBuf) -> Vec<Entry> {
     return entries;
 }
 
-fn sort_entries(entries: &mut Vec<Entry>) {
-    // ordered.sort_by_key(|a| std::cmp::Reverse( into_name_str(a) ) );
-    entries.sort_by(|a, b| {
-        if a.is_dir && !b.is_dir {
-            return Ordering::Less;
-        }
-        if !a.is_dir && b.is_dir {
-            return Ordering::Greater;
-        }
-        return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
-    });
-}
 
