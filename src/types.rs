@@ -4,21 +4,16 @@ use std::fs::DirEntry;
 use std::marker::PhantomData;
 use std::fmt::{Display, Formatter, Error};
 use std::cmp::Ordering;
+use std::time::SystemTime;
+
+use chrono::{DateTime, TimeZone, Local};
 
 #[derive(PartialEq, Clone)]
 pub struct FileSize(u64);
 #[derive(PartialEq, Clone)]
 pub struct FileName(String);
 #[derive(PartialEq, Clone)]
-pub struct FileDate(String);
-
-/*
-pub trait FileProperty {}
-
-impl FileProperty for FileSize {}
-impl FileProperty for FileName {}
-impl FileProperty for FileDate {}
-*/
+pub struct FileDate(DateTime<Local>);
 
 pub enum FileProperty {
     Name,
@@ -47,6 +42,7 @@ impl std::convert::From<DirEntry> for Entry {
     fn from(de: DirEntry) -> Self {
         let p = de.path();
         let metadata = de.metadata().unwrap();
+
         let mut name : String = p.file_name().unwrap().to_str().unwrap().to_string();
         let is_dir = p.is_dir();
         /*
@@ -58,36 +54,18 @@ impl std::convert::From<DirEntry> for Entry {
         if is_dir {
             name = format!("{}/", name);
         }
+
+        let date = DateTime::<Local>::from(metadata.modified().unwrap());
         
         return Self {
             path: p,
             is_dir: is_dir, 
             name: FileName(name),
             size: FileSize(metadata.len()),
-            modified: FileDate("Jan 1".to_string()),
+            modified: FileDate(date),
         };
     }
 }
-
-/*
-impl FileProperty {
-    fn cmp(&self, other: Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (Self::Name(a), Self::Name(b)) => {
-                if a.is_dir && !b.is_dir {
-                    return Ordering::Less;
-                }
-                if !a.is_dir && b.is_dir {
-                    return Ordering::Greater;
-                }
-                return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
-         
-            },
-        }
-
-    }
-}
-*/
 
 impl Layout {
 
@@ -124,6 +102,12 @@ impl Display for FileName {
     }
 }
 
+impl Display for FileDate {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}", self.0.format("%Y"))
+    }
+}
+
 pub struct SortOrder {
     pub fileproperty: FileProperty,
     pub ascending: bool,
@@ -152,26 +136,4 @@ impl SortOrder {
         }
     }
 }
-
-/*
-pub struct SortOrder<T> where T: FileProperty {
-    phantom: PhantomData<T>,
-    pub ascending: bool,
-}
-
-impl<T> SortOrder<T> where T: FileProperty {
-    pub fn ascending(b : bool) -> Self {
-        Self {
-            ascending: b,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<T> Display for SortOrder<T> where T: FileProperty {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}: {}", std::any::type_name::<T>(), self.ascending)
-    }
-}
-*/
 

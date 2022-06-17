@@ -104,7 +104,12 @@ impl Model for AppModel {
         for entry in self.viewable_entries().iter() {
 //        for entry in &self.entries[self.layout.list_min_pos..self.layout.list_max_pos] {
 
-            let child_filename = entry.name.to_string();
+            let name = entry.name.to_string();
+            let size = match entry.is_dir {
+                true => "".to_string(),
+                false => entry.size.to_string(),
+            };
+            let date = entry.modified.to_string();
 
             // chars.count is num unicode points
             // which i assume equals num char widths shown on terminal
@@ -114,7 +119,7 @@ impl Model for AppModel {
             // of two unicode points, the first (and maybe second)
             // of which are a normal fontthing (eg black person emoji),
             // but seems like best possible with std
-            let name_width = str_width(&child_filename);
+            let name_width = str_width(&name);
             let spaces_width = w - name_width - 2;
             let spaces = " ".repeat(spaces_width);
             queue!(
@@ -129,7 +134,7 @@ impl Model for AppModel {
 
             queue!(
                 buf,
-                Print(format!("{}{}", &child_filename, spaces)),
+                Print(format!("{}     {}    {}", name, size, date)),  // spaces)),
                 // SetBackgroundColor(Color::DarkGrey),
                 ResetColor,
                 // SetForegroundColor(Color::White),
