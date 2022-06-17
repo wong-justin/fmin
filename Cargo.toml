@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 crossterm = "0.*"
 chrono = "0.*"
+byte-unit = "4.*"

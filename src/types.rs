@@ -4,9 +4,9 @@ use std::fs::DirEntry;
 use std::marker::PhantomData;
 use std::fmt::{Display, Formatter, Error};
 use std::cmp::Ordering;
-use std::time::SystemTime;
 
 use chrono::{DateTime, TimeZone, Local};
+use byte_unit::Byte;
 
 #[derive(PartialEq, Clone)]
 pub struct FileSize(u64);
@@ -91,8 +91,11 @@ impl Layout {
 }
 
 impl Display for FileSize {
+    // "999.99 GB"  "1 B"
+    // max 9 chars, min 3
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}B", self.0)
+        // write!(f, "{}B", self.0)
+        write!(f, "{}", Byte::from_bytes(self.0.into()).get_appropriate_unit(false).to_string())
     }
 }
 
@@ -103,8 +106,10 @@ impl Display for FileName {
 }
 
 impl Display for FileDate {
+    // "10/10/10 10:10 PM"  "1/01/01 1:01 AM"
+    // max 17 char widths, min 15
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.0.format("%Y"))
+        write!(f, "{}", self.0.format("%-m/%-d/%y %-I:%M %p"))
     }
 }
 
