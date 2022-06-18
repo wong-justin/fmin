@@ -30,14 +30,6 @@ pub struct Entry {
     pub modified: FileDate,
 }
 
-pub struct Layout {
-    pub W: usize,
-    pub H: usize,
-    pub list_min_pos: usize,
-    pub list_max_pos: usize,
-}
-
-
 impl std::convert::From<DirEntry> for Entry {
     fn from(de: DirEntry) -> Self {
         let p = de.path();
@@ -67,28 +59,10 @@ impl std::convert::From<DirEntry> for Entry {
     }
 }
 
-impl Layout {
-
-    pub fn empty() -> Self {
-        Self {
-            W: 0,
-            H: 0,
-            list_min_pos: 0,
-            list_max_pos: 0,
-        }
-    }
-
-    pub fn resize(&mut self, w: u16, h: u16) {
-        self.W = w as usize;
-        self.H = h as usize;
-        self.list_max_pos = self.H - 6 + self.list_min_pos;
-    }
-
-    pub fn reset_list_pos(&mut self) {
-        self.list_min_pos = 0;
-        self.list_max_pos = self.H - 6
-    }
+fn str_width<S: AsRef<str>> (s: S) -> usize {
+    return s.as_ref().chars().count();
 }
+
 
 impl Display for FileSize {
     // "999.99 GB"  "1 B"
@@ -105,11 +79,50 @@ impl Display for FileName {
     }
 }
 
+impl FileName {
+    pub fn fit(&self, nchars: usize) -> String {
+        match str_width(&self.0) {
+            n if n <= nchars => {
+                let spaces = " ".repeat(nchars - n);
+                return format!("{}{}", self.0, spaces)
+            },
+            n => {
+                let prefix = "...";
+                let prefix_len = str_width(prefix);
+                let discard_len : usize = (n - nchars) + prefix_len; 
+                let suffix : String = self.0.chars().skip(discard_len).take(nchars - prefix_len).collect::<String>();
+                return format!("{}{}", prefix, suffix);
+            }
+        }
+    }
+}
+
+impl FileDate {
+    pub fn fit(&self, nchars: usize) -> String {
+        let fullstr = self.0.format("%-m/%-d/%y");
+        return format!("{: >width$}", fullstr, width=nchars);
+    }
+}
+
+impl FileSize {
+    pub fn fit(&self, nchars: usize) -> String {
+        let fullstr = Byte::from_bytes(self.0.into()).get_appropriate_unit(false).to_string();
+        return format!("{: >width$}", fullstr, width=nchars);
+    }
+}
+
+
+
+
+
 impl Display for FileDate {
     // "10/10/10 10:10 PM"  "1/01/01 1:01 AM"
     // max 17 char widths, min 15
+    //
+    // "10/10/10" max 9 chars
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.0.format("%-m/%-d/%y %-I:%M %p"))
+        // write!(f, "{}", self.0.format("%-m/%-d/%y %-I:%M %p"))
+        write!(f, "{}", self.0.format("%-m/%-d/%y"))
     }
 }
 
@@ -141,4 +154,5 @@ impl SortOrder {
         }
     }
 }
+
 

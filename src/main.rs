@@ -17,10 +17,12 @@ use crossterm::{
 };
 
 use crate::tuimodel::{Model, start_event_loop};
-use crate::types::{Entry, FileProperty, FileSize, FileDate, FileName, SortOrder, Layout,};
+use crate::types::{Entry, FileProperty, FileSize, FileDate, FileName, SortOrder,};
+use crate::ui::{Layout,};
 
 mod tuimodel;
 mod types;
+mod ui;
 
 fn main() {
     let cwd = env::current_dir().unwrap();
@@ -41,6 +43,7 @@ struct AppModel {
     // lastModifier: String,
     layout: Layout,
 }
+
 
 impl Model for AppModel {
 
@@ -104,12 +107,17 @@ impl Model for AppModel {
         for entry in self.viewable_entries().iter() {
 //        for entry in &self.entries[self.layout.list_min_pos..self.layout.list_max_pos] {
 
-            let name = entry.name.to_string();
+            // let name = entry.name.to_string();
+            let name = entry.name.fit(self.layout.col1_end - self.layout.col1_start);
+
+            let size_width = self.layout.col2_end - self.layout.col2_start;
+
             let size = match entry.is_dir {
-                true => "".to_string(),
-                false => entry.size.to_string(),
+                true => " ".repeat(size_width),
+                false => entry.size.fit(size_width),
             };
-            let date = entry.modified.to_string();
+            // let date = entry.modified.to_string();
+            let date = entry.modified.fit(self.layout.col3_end - self.layout.col3_start);
 
             // chars.count is num unicode points
             // which i assume equals num char widths shown on terminal
@@ -124,7 +132,7 @@ impl Model for AppModel {
             let spaces = " ".repeat(spaces_width);
             queue!(
                 buf,
-                cursor::MoveTo(1, lineno),
+                cursor::MoveTo(self.layout.col1_start as u16, lineno),
             );
 
             let is_focused = self.focused_entry.as_ref() == Some(entry);
@@ -134,10 +142,8 @@ impl Model for AppModel {
 
             queue!(
                 buf,
-                Print(format!("{}     {}    {}", name, size, date)),  // spaces)),
-                // SetBackgroundColor(Color::DarkGrey),
+                Print(format!("{} {} {}", name, size, date)),
                 ResetColor,
-                // SetForegroundColor(Color::White),
             );
             lineno += 1;
         }
@@ -194,7 +200,7 @@ impl AppModel where {
         };
 
         let (w, h) = terminal::size().unwrap();
-        let mut layout = Layout::empty();
+        let mut layout = Layout::default();
         layout.resize(w, h);
 
         Self {
@@ -268,5 +274,4 @@ fn dir_entries(dir: &PathBuf) -> Vec<Entry> {
     }
     return entries;
 }
-
 
