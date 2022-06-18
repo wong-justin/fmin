@@ -108,16 +108,16 @@ impl Model for AppModel {
 //        for entry in &self.entries[self.layout.list_min_pos..self.layout.list_max_pos] {
 
             // let name = entry.name.to_string();
-            let name = entry.name.fit(self.layout.col1_end - self.layout.col1_start);
+            let name = entry.name.fit(self.layout.col1_end - self.layout.col1_start + 1);
 
-            let size_width = self.layout.col2_end - self.layout.col2_start;
+            let size_width = self.layout.col2_end - self.layout.col2_start;  // + 1;
 
             let size = match entry.is_dir {
                 true => " ".repeat(size_width),
                 false => entry.size.fit(size_width),
             };
             // let date = entry.modified.to_string();
-            let date = entry.modified.fit(self.layout.col3_end - self.layout.col3_start);
+            let date = entry.modified.fit(self.layout.col3_end - self.layout.col3_start);  // + 1);
 
             // chars.count is num unicode points
             // which i assume equals num char widths shown on terminal
@@ -127,9 +127,6 @@ impl Model for AppModel {
             // of two unicode points, the first (and maybe second)
             // of which are a normal fontthing (eg black person emoji),
             // but seems like best possible with std
-            let name_width = str_width(&name);
-            let spaces_width = w - name_width - 2;
-            let spaces = " ".repeat(spaces_width);
             queue!(
                 buf,
                 cursor::MoveTo(self.layout.col1_start as u16, lineno),
@@ -142,7 +139,7 @@ impl Model for AppModel {
 
             queue!(
                 buf,
-                Print(format!("{} {} {}", name, size, date)),
+                Print(format!("{}  {}  {}", name, size, date)),
                 ResetColor,
             );
             lineno += 1;

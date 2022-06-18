@@ -100,14 +100,14 @@ impl FileName {
 impl FileDate {
     pub fn fit(&self, nchars: usize) -> String {
         let fullstr = self.0.format("%-m/%-d/%y");
-        return format!("{: >width$}", fullstr, width=nchars);
+        return format!("{: <width$}", fullstr, width=nchars);
     }
 }
 
 impl FileSize {
     pub fn fit(&self, nchars: usize) -> String {
         let fullstr = Byte::from_bytes(self.0.into()).get_appropriate_unit(false).to_string();
-        return format!("{: >width$}", fullstr, width=nchars);
+        return format!("{: <width$}", fullstr, width=nchars);
     }
 }
 

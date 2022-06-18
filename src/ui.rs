@@ -59,7 +59,9 @@ impl Layout {
         self.row4_start = self.H - 2;
         self.row4_end = self.H - 2;
         self.col3_end = self.W - 2;
-        self.col3_start = &self.col3_end - 17 + 1;
+        // self.col3_start = &self.col3_end - 17 + 1;
+        // 17 for full timestamp, 9 for datestamp, 12 for modified header
+        self.col3_start = &self.col3_end - 12 + 1;
         self.col2_end = &self.col3_start - 2;
         self.col2_start = &self.col2_end - 9 + 1;
         self.col1_end = &self.col2_start - 2;
