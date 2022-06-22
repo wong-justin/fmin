@@ -2,8 +2,8 @@ finite_state_machine = {
 
 
 states = {
-	DIRECTORY_FILTERING,
-	DIRECTORY_NAVIGATION,
+	FILTERING,
+	NAVIGATING,
 	// COMMAND_FORMATION,
 }
 
@@ -15,46 +15,36 @@ actions = {
 	RESUME_FILTERING,
 	UPDATE_NAVIGATION,
 }
+
+behaviors = {
+	[GOTO_DIR]: (model, dir) -> {
+	model.entries = dir.get_entries
+	model.focused_entry_index = 0 or None
+	model.filter_text = ""
+	model.state = FILTERING
+	},
+	[UPDATE_FILTER]: (model, filter_text) -> {
+	model.filter_text = filter_text
+	model.entries = model.entries.filter |x| filter_text in x.name.lower
+	model.focused_entry_index = find_prev_entry or 0 or None ?
+	model.state = FILTERING
+	}	
+	[RESUME_NAVIGATING]: (model) -> {
+	model.state = NAVIGATING
+	}
+	[RESUME_FILTERING]: (model) -> {
+	model.state = FILTERING
+	}
+	[UPDATE_HIGHLIGHTED_ENTRY]: (model, focused_entry_index) {
+	model.focused_entry_index = focused_entry_index
+	model.state = NAVIGATING
+	}
 	
 views = {
-	directory_pane: (...),
 	...,
 }
 
-event_handlers = {
-	APP_OPENED -> DIRECTORY_FILTERING 
-	init_directory_pane(initial_dir), disp_editable_filter 
-	
-	FILTER_FOCUSED -> DIRECTORY_FILTERING
-	disp_editable_filter	
 
-	FILTER_CHANGED -> DIRECTORY_FILTERING
-	disp_editable_filter(new_text)	
-
-	FILTER_CANCELED -> DIRECTORY_NAVIGATION
-	disp_highlighted_entry
-
-	NAVIGATION_FOCUSED -> DIRECTORY_NAVIGATION
-	disp_highlighted_entry
-
-	NAVIGATION_UPDATED -> DIRECTORY_NAVIGATION
-	change_highlighted_entry(??)
-
-	DIRECTORY_CHANGED -> DIRECTORY_FILTERING
-	init_directory_pane(initial_dir), disp_editable_filter
-}
-	
-event_options = {
-	DIRECTORY_FILTERING:
-		FILTER_CHANGED,
-		FILTER_CANCELED,
-		NAVIGATION_FOCUSED,
-		DIRECTORY_CHANGED,
-	DIRECTORY_NAVIGATION:
-		NAVIGATION_UPDATED,
-		FILTER_FOCUSED,
-		DIRECTORY_CHANGED,
-}
 		
 		
 
