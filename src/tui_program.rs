@@ -35,17 +35,20 @@ impl<I, V, U> Program<I, V, U> {
     {
         let Self {init, view, update} = self;
         let mut stdout = stdout();
-        execute!(stdout, terminal::EnterAlternateScreen);
+        queue!(stdout, terminal::EnterAlternateScreen);
 
         let mut model = init();
-        println!("{}", view(&model));
+        queue!(stdout, Print(view(&model)),);
+        stdout.flush();
 
         loop {
             let event = await_next_event().unwrap();
             if update(&mut model, event).is_none() {
                 break;
             }
-            println!("{}", view(&model));
+            queue!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
+            queue!(stdout, MoveTo(0, 0), Print(view(&model)),);
+            stdout.flush();
         }
         execute!(stdout, terminal::LeaveAlternateScreen);
     }

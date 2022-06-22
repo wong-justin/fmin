@@ -33,11 +33,16 @@ struct Model {
 
 
 
-#[derive(Debug)]
 struct Entry {
     path: PathBuf,
     is_dir: bool,
     name: String,
+}
+
+impl std::fmt::Debug for Entry {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 impl std::convert::From<DirEntry> for Entry {
@@ -99,7 +104,6 @@ fn view(m: &Model) -> String {
         m.filter_text,
     )
 }
-
 
 fn main() {
     println!("");
