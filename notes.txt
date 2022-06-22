@@ -1,0 +1,61 @@
+finite_state_machine = {
+
+
+states = {
+	DIRECTORY_FILTERING,
+	DIRECTORY_NAVIGATION,
+	// COMMAND_FORMATION,
+}
+
+actions = {
+	GOTO_DIR(model, dir),
+	UPDATE_FILTER(model, filter_text),
+	CLEAR_FILTER_AND_RESUME_NAVIGATING(model),
+	RESUME_NAVIGATING,
+	RESUME_FILTERING,
+	UPDATE_NAVIGATION,
+}
+	
+views = {
+	directory_pane: (...),
+	...,
+}
+
+event_handlers = {
+	APP_OPENED -> DIRECTORY_FILTERING 
+	init_directory_pane(initial_dir), disp_editable_filter 
+	
+	FILTER_FOCUSED -> DIRECTORY_FILTERING
+	disp_editable_filter	
+
+	FILTER_CHANGED -> DIRECTORY_FILTERING
+	disp_editable_filter(new_text)	
+
+	FILTER_CANCELED -> DIRECTORY_NAVIGATION
+	disp_highlighted_entry
+
+	NAVIGATION_FOCUSED -> DIRECTORY_NAVIGATION
+	disp_highlighted_entry
+
+	NAVIGATION_UPDATED -> DIRECTORY_NAVIGATION
+	change_highlighted_entry(??)
+
+	DIRECTORY_CHANGED -> DIRECTORY_FILTERING
+	init_directory_pane(initial_dir), disp_editable_filter
+}
+	
+event_options = {
+	DIRECTORY_FILTERING:
+		FILTER_CHANGED,
+		FILTER_CANCELED,
+		NAVIGATION_FOCUSED,
+		DIRECTORY_CHANGED,
+	DIRECTORY_NAVIGATION:
+		NAVIGATION_UPDATED,
+		FILTER_FOCUSED,
+		DIRECTORY_CHANGED,
+}
+		
+		
+
+	  
