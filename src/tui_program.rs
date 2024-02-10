@@ -1,3 +1,5 @@
+// mini framework for application lifecycle and terminal display
+
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
@@ -26,19 +28,28 @@ pub struct Program<Init, View, Update> {
     pub update: Update,
 }
 
-impl<I, V, U> Program<I, V, U> {
+impl<Init, View, Update> Program<Init, View, Update> {
     pub fn run<Model>(self) 
     where 
-        I: FnOnce() -> Model, 
-        V: Fn(&Model) -> String,
-        U: Fn(&mut Model, Event) -> Option<()>, 
+        Init: FnOnce() -> Model, 
+        View: Fn(&Model, &mut std::io::Stdout),
+        Update: Fn(&mut Model, Event) -> Option<()>, 
     {
         let Self {init, view, update} = self;
         let mut stdout = stdout();
-        queue!(stdout, terminal::EnterAlternateScreen);
+
+        // disables some behavior like line wrapping and catching Enter presses: https://docs.rs/crossterm/latest/crossterm/terminal/index.html#raw-mode
+        terminal::enable_raw_mode(); 
+        queue!(stdout, 
+               terminal::EnterAlternateScreen,
+               terminal::DisableLineWrap,
+               crossterm::cursor::Hide,
+               crossterm::cursor::EnableBlinking, // to signify focus in filter mode; will be hidden anyways in other modes
+        );
 
         let mut model = init();
-        queue!(stdout, Print(view(&model)),);
+        view(&model, &mut stdout);
+        // display(&mut stdout, view(&model));
         stdout.flush();
 
         loop {
@@ -47,9 +58,27 @@ impl<I, V, U> Program<I, V, U> {
                 break;
             }
             queue!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
-            queue!(stdout, MoveTo(0, 0), Print(view(&model)),);
+            view(&model, &mut stdout);
+            // display(&mut stdout, view(&model));
             stdout.flush();
         }
-        execute!(stdout, terminal::LeaveAlternateScreen);
+
+        // cleanup and be a good citizen so the terminal behaves normally afterwards (eg. start catching ctrl+c again, and show cursor)
+        execute!(stdout, 
+                 terminal::LeaveAlternateScreen,
+                 crossterm::cursor::Show,
+        );
+        terminal::disable_raw_mode(); 
     }
 }
+
+// fn display(stdout: &mut std::io::Stdout, content: String) {
+//     // queue!(stdout, MoveTo(0, 0), Print(view(&model)),);
+// 
+//     let mut i = 0;
+//     let lines = content.split("\n");
+//     for line in lines {
+//         queue!(stdout, MoveTo(0, i), Print(line),);
+//         i += 1;
+//     }
+// }
