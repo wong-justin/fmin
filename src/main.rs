@@ -590,69 +590,14 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     // since crossterm lib puts control bytes in custom types like SetBackgroundColor
     // that must be used here in impure queue!(buf, ...) function
     // and not postponed for agnostic model/update/view loop
-    // maybe i can send a list of crossterm::Commands to queue...
-
-    // OLD PRINT LINES:
-    
-    // let output_string = format!("\n {}\n\n{}\n\n {}{}\n\n controls:\n{}",
-    //     m.cwd.display().to_string(),
-    //     match m.mode {
-    //         Mode::Filter | Mode::Normal => {
-    //             m.all_entries
-    //                 .iter()
-    //                 .map(|entry| format!("  {}", entry.name) )
-    //                 .filter(|name| name.to_lowercase().contains(&m.filter_text.to_lowercase()) )
-    //                 .collect::<Vec<String>>()
-    //                 .join("\n")
-    //         },
-    //         Mode::Jump => "".to_string(),
-    //     },
-    //     match m.mode {
-    //         Mode::Filter => "(filter)           /",
-    //         Mode::Normal => "(normal)",
-    //         Mode::Jump => "(jump to dir)          jump to:",
-    //         // Mode::CommandPalette => "(commands)          ?",
-    //     },
-    //     m.filter_text,
-    //     match m.mode {
-    //         Mode::Filter => "   type to filter\n   esc to clear\n   enter to open dir\n   ctrl+j to jump to frecent dir",
-    //         Mode::Normal => "   / to filter curr dir\n   ctrl+j to jump to frecent dir\n   backspace to nav up dir\n   enter to open dir or file", // ? for command palette
-    //         Mode::Jump => "   type to filter frecent dirs\n   esc to clear\n   enter to nav to dir",
-    //         // Mode::CommandPalette => "type to filter commands, esc to clear, enter to execute",
-    //         // potential command palette commands:
-    //         // (y)ank selected files
-    //         // (p)aste selected files
-    //         // (m)ark file as selected
-    //         // (g)o to top of list
-    //         // (G)o to bottom of list
-    //         // (ctrl+j)ump to frecent dir
-    //         // open command (ctrl+p)alette
-    //         // (Q)uit fmin
-    //         // print selected filepaths to stdout
-    //         // copy selected filepaths to clipboard
-
-    //         // consider also server/client setup
-    //         // so dual-pane is optional and happens by twm / terminal panes
-    //         // and one client can yank and the other client can paste
-    //         // and also getting cli options while client tui is running, like
-    //         // (yank in client and then elsewhere) fmin --print-selected-filepaths
-
-    //         // also remember feature of updating cwd if other programs update files in the dir
-    //         // need directory watcher functionality, kinda like entr
-    //         // although its workaroundable by just going back and forth, essentially refreshing
-    //     },
-    // );
-    // let mut i = 0;
-    // let lines = output_string.split("\n");
-    // for line in lines {
-    //     queue!(stdout, MoveTo(0, i), Print(line),);
-    //     i += 1;
-    // }
-    
-
-    // NEW PRINT
     //
-    // idea for declarative view, without implementing a whole ui framework
+    // maybe i can send a list of crossterm::Commands to queue...
+    // but probably not worth making a whole structure of dozens of commands, 
+    // only to delay writing to the same place one function later,
+    // just for the sake of 'purity'
+
+    // half-declarative view, without implementing a whole ui framework
+    // hinges on having only one stretch box horiz and vert - rest are static sizes
 
     //  C:\users\jkwon\desktop\programming\modenv
     //  ___________________________________________
@@ -667,7 +612,7 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     //  main.py                  1.2 GB   2022-05
     //  utils.py                 985 B    2021-12
     // 
-    //  :?!@>/openwithvim                   /py 
+    //  (mode) :?!@>/someinputtext                
     //  ___________________________________________
     
     // | <- fill -> |
@@ -681,8 +626,9 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     // | <- fill -> | 10 (cursor sometimes) |
     // | <- fill -> |
     
-    // width of these two attribute columns, assuming ascii chars
-    const SIZE_MAX_COLS : usize = 10;
+    // width of attribute columns, assuming ascii chars, based on desired formatted output and what
+    // looks ok, including margins
+    const SIZE_MAX_COLS : usize = 11;
     const DATE_MAX_COLS : usize = 14;
 
     let name_header = format!(" Name {} ", sort_indicator(SortAttribute::Name, m.cwd_sort));
@@ -698,6 +644,7 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     );
     queue!(stdout, MoveTo(0, 4), Print(divider));
 
+    // middle rows, stretch to fill
     let filtered_entries = m.sorted_entries
         .clone()
         .into_iter()
