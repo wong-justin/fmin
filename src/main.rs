@@ -1,4 +1,5 @@
 // fmin, a temrinal file manager inspired by fman + vim
+// and might be like midnight commander too
 
 #![allow(unused_variables)]
 #![allow(unused_imports)]
@@ -11,6 +12,8 @@ use std::hash::{Hash, Hasher};
 use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
 
+use byte_unit::Byte;
+use chrono::{DateTime, Datelike, TimeZone, Local};
 use crossterm::{
     terminal,
     queue,
@@ -40,6 +43,7 @@ struct Model {
     // rather than sort from filtered list every keypress
     // should calculate and store filtered and sorted entries at cd time
     // so that less work is required during render time
+    // all_entries -> sort -> filter -> viewable slice of entries
     all_entries: HashSet<Entry>,
     sorted_entries: Vec<StringifiedEntry>,
     filter_text: String,
@@ -62,40 +66,66 @@ enum Action {
     SelectFirstEntry,
     StartFilterMode,
     StartJumpMode,
+    SortBy(SortAttribute),
+    ReverseSort,
     // StartCommandPaletteMode,
     Noop,
     Quit,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 enum SortAttribute {
     Name,
-    // Size,
-    // Date,
+    Size,
+    Date,
 }
 
 #[derive(Copy, Clone)]
 struct SortBy {
     attribute: SortAttribute,
-    // ascending: bool,
+    ascending: bool,
 }
 
 struct Entry {
     path: PathBuf,
     is_dir: bool,
     name: FileName,
-    // size: Maybe(FileSize),
-    // date: Maybe(FileDate),
+    // on maybe(date) and maybe(size):
+    // dirs dont have filesize - maybe count num of items in dir and display that instead? even recursively?
+    // also for permission errors, like window sspeical folder $recyclebin probably wont give you
+    // any metadata about size or date modified
+    size: Option<FileSize>,
+    date: Option<FileDate>, 
 }
 
 struct StringifiedEntry {
     name: String,
+    size: String,
+    date: String,
 }
 
 impl Clone for StringifiedEntry {
     fn clone(&self) -> StringifiedEntry {
         StringifiedEntry {
             name: self.name.clone(),
+            size: self.size.clone(),
+            date: self.date.clone(),
+        }
+    }
+}
+
+impl From<&Entry> for StringifiedEntry {
+    fn from(entry: &Entry) -> Self {
+        StringifiedEntry {
+            name : entry.name.0.clone(),
+            size: match &entry.size {
+                Some(size_bytes) => size_bytes.to_string(),
+                None => String::new(),
+            },
+            date: match &entry.date {
+                Some(date_modified) => date_modified.to_string(),
+                None => String::new(),
+            },
         }
     }
 }
@@ -106,6 +136,8 @@ impl Clone for Entry {
             path: self.path.clone(),
             is_dir: self.is_dir.clone(),
             name: self.name.clone(),
+            size: self.size.clone(),
+            date: self.date.clone(),
         }
     }
 }
@@ -127,14 +159,100 @@ impl Hash for Entry {
 #[derive(PartialEq, Clone)]
 struct FileName(String);
 
-// #[derive(PartialEq, Clone)]
-// struct FileSize(u64);
-// #[derive(PartialEq, Clone)]
-// struct FileDate(DateTime<Local>);
+#[derive(PartialEq, Clone)]
+struct FileSize(u64);
+
+#[derive(PartialEq, Clone)]
+struct FileDate(DateTime<Local>);
 
 impl Display for FileName {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{}", self.0)
+    }
+}
+
+impl Display for FileSize {
+    // formatting options to explore:
+    // 1) two sig figs / digits, like
+    // 0 - 99 B
+    // 0.1 - 9.9, 10 - 99
+    // KB, MB, GB
+    // it has max 6 char widths
+    //   4 B
+    // 1.5 KB
+    //  27 MB
+    // 0.9 GB
+    // 3) or 3 sig figs, like
+    // 0-999 B
+    // 1.00 - 9.99
+    // 10.0 - 99.9
+    // 100 - 999
+    // KB, MB, GB
+    // it has max 7 char widths
+    //    1 B
+    //  514 KB
+    // 87.2 MB
+    // 2.31 GB
+    // 3) copy how ls -lh does it
+    // 4) use standard behavior from bytes crate, like
+    // "999.99 GB"  "1 B"
+    // which is max 9 chars, min 3
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        // this is currently option 4)
+        // i want to try option 2) though
+        write!(f, "{}", Byte::from_bytes(self.0.into()).get_appropriate_unit(false).to_string())
+    }
+}
+
+impl Display for FileDate {
+    // options for formatting last modified date:
+    //
+    // 1) either go midnight commander style, showing time if this year else year for prior year
+    // which is 12 chars. eg. if now is july 2022, examples include
+    // Jan  1 23:59
+    // Jan  1 23:59
+    // Dec 31  2021
+    // Jun 15 12:00
+    // although it hurts to lose 24h time when new year begins (eg. starting jan 2022, dec 2021
+    // hours will be hidden)
+    //
+    // 1.5) shorten above a little bit by abbreviating year
+    // and i guess abbreviating hour too
+    // which is 10ch, like 
+    // Dec 31 '21
+    // Jan  1 +23
+    // Jun 12 +12
+    //
+    // 2) or even like imperium, disp how long since modified, max 4 char widths
+    // 8d.      8 d
+    // 5hr.     5 h
+    // 1min.    1 m
+    // 2mo.     2 M
+    // 1yr.     1 y
+    // 19d.    19 d
+    // aka
+    // 1-59 m
+    // 1 - 23 h
+    // 1 - 29? d
+    // 1 - 11 M
+    // 1 - 99? y
+    // bad tho because id like to see finer-grained differences, like 8d vs 8d12h
+    //
+    // 3) "10/10/10 10:10 PM"  "1/01/01 1:01 AM"
+    // max 17 char widths, min 15
+    // %-m/%-d/%y %-I:%M %p
+    //
+    // 4) "10/10/10" max 9 chars
+    // %-m/%-d/%y
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        let now = Local::now();
+        let modified = self.0;
+        let format = match now.year() == modified.year() {
+            // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+            true => "%b %e %k:%M",
+            false => "%b %e  %Y",
+        };
+        write!(f, "{}", modified.format(format))
     }
 }
 
@@ -150,14 +268,24 @@ impl SortBy {
                 }
                 return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
             },
-            // SortAttribute::Size => {
-            //     match (a.size.0, b.size.0) {
-            //         (a,b) if a < b => Ordering::Less, 
-            //         (a,b) if a > b => Ordering::Greater,
-            //         _ => Ordering::Equal,
-            //     }
-            // }
-            // SortAttribute::Date => Ordering::Equal,
+            SortAttribute::Size => {
+                match (&a.size, &b.size) {
+                    (None, Some(b)) => Ordering::Less,
+                    (Some(a), None) => Ordering::Greater,
+                    (Some(a), Some(b)) if a.0 < b.0 => Ordering::Less, 
+                    (Some(a), Some(b)) if a.0 > b.0 => Ordering::Greater,
+                    _ => Ordering::Equal,
+                }
+            }
+            SortAttribute::Date => {
+                match (&a.date, &b.date) {
+                    (None, Some(b)) => Ordering::Less,
+                    (Some(a), None) => Ordering::Greater,
+                    (Some(a), Some(b)) if a.0 < b.0 => Ordering::Less, 
+                    (Some(a), Some(b)) if a.0 > b.0 => Ordering::Greater,
+                    _ => Ordering::Equal,
+                }
+            }
         }
     }
 }
@@ -173,16 +301,35 @@ impl std::convert::From<DirEntry> for Entry {
     // to reproduce: read_entries(/mnt/c)
     fn from(oldentry: DirEntry) -> Self {
         let path = oldentry.path();
-        // let metadata = oldentry.metadata().unwrap();
-        let is_dir = path.is_dir();
         let mut name = path.file_name().unwrap().to_str().unwrap().to_string();
+        let is_dir = path.is_dir();
+        let mut size_bytes = None;
+        let mut date_modified = None;
+        match oldentry.metadata() {
+            Ok(metadata) => {
+                size_bytes = Some(FileSize(metadata.len()));
+                date_modified = match metadata.modified() {
+                    // apparently some platforms do not have mtime / ftLastWriteTime available
+                    // https://doc.rust-lang.org/std/fs/struct.Metadata.html#errors
+                    Ok(system_time) => {
+                        Some(FileDate(DateTime::<Local>::from(system_time)))
+                    },
+                    Err(err) => None,
+                };
+            },
+            Err(err) => (),
+        };
         if is_dir {
             name = format!("{}/", name);
+            // size of dir just returns size of os-dir file object thingy, which is not useful
+            size_bytes = None;
         }
         Self {
             path: path,
             is_dir: is_dir,
             name: FileName(name),
+            size: size_bytes,
+            date: date_modified,
         }
     }
 }
@@ -204,8 +351,6 @@ fn read_entries(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
         // todo: give better msg if io err reading dir
         Err(err) => HashSet::new()
     }
-    // entries.sort_by(|a,b| sort.compare_entries(a,b) );
-    // return entries;
 }
 
 // APP LOGIC
@@ -218,7 +363,7 @@ fn main() {
 fn init() -> Model {
     let cwd = std::env::current_dir().unwrap();
     // let cwd = PathBuf::from("/mnt/c/Users");
-    let sort = SortBy{ attribute: SortAttribute::Name };
+    let sort = SortBy{ attribute: SortAttribute::Name, ascending: true };
     let all_entries = read_entries(&cwd, sort);
     let sorted_entries = sort_entries(&all_entries, sort);
     let (cols, rows) = match terminal::size() {
@@ -244,9 +389,12 @@ fn sort_entries(entries: &HashSet<Entry>, sort: SortBy) -> Vec<StringifiedEntry>
         .into_iter()
         .collect::<Vec<&Entry>>();
     entries_vec.sort_by(|a,b| sort.compare_entries(a,b));
+    if !sort.ascending {
+        entries_vec.reverse();
+    }
     entries_vec
         .into_iter()
-        .map(|entry| StringifiedEntry { name : entry.name.0.clone() })
+        .map(|entry| StringifiedEntry::from(entry) )
         .collect::<Vec<StringifiedEntry>>()
 }
 
@@ -280,6 +428,24 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                             match m.cwd.parent() {
                                 Some(path) => Action::GotoDir(path.to_owned()),
                                 None => Action::Noop,
+                            }
+                        },
+                        KeyCode::Char('n') => {
+                            match m.cwd_sort.attribute {
+                                SortAttribute::Name => Action::ReverseSort,
+                                _ => Action::SortBy(SortAttribute::Name),
+                            }
+                        },
+                        KeyCode::Char('s') => {
+                            match m.cwd_sort.attribute {
+                                SortAttribute::Size => Action::ReverseSort,
+                                _ => Action::SortBy(SortAttribute::Size),
+                            }
+                        },
+                        KeyCode::Char('d') => {
+                            match m.cwd_sort.attribute {
+                                SortAttribute::Date => Action::ReverseSort,
+                                _ => Action::SortBy(SortAttribute::Date),
                             }
                         },
                         // KeyCode::Char('j') => {
@@ -361,6 +527,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
             m.mode = Mode::Filter;
             m.cwd = pathbuf;
+            m.cwd_sort = SortBy { attribute: SortAttribute::Name, ascending: true };
             Some(())
         },
         Action::SetFilterText(text) => {
@@ -372,7 +539,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             Some(())
         },
         Action::SelectFirstEntry => {
-            let first = m.all_entries
+            let first = m.all_entries // sorted_entries
                 .iter()
                 .filter(|entry| entry.name.0.to_lowercase().contains(&m.filter_text.to_lowercase()) )
                 .filter(|entry| entry.is_dir )
@@ -384,10 +551,24 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                     m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
                     m.mode = Mode::Filter;
                     m.filter_text = "".to_string();
+                    m.cwd_sort = SortBy { attribute: SortAttribute::Name, ascending: true };
                     Some(())
                 },
                 None => Some(()),
             }
+        },
+        Action::SortBy(attribute) => {
+            m.cwd_sort.attribute = attribute;
+            m.cwd_sort.ascending = true;
+            // m.cwd_sort = SortBy { attribute: attribute, ascending: true };
+            m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
+            Some(())
+        },
+        Action::ReverseSort => {
+            m.cwd_sort.ascending = !m.cwd_sort.ascending;
+            // m.cwd_sort = SortBy { attribute: m.cwd_sort.attribute, ascending: !m.cwd_sort.ascending };
+            m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
+            Some(())
         },
         Action::StartFilterMode => {
             m.mode = Mode::Filter;
@@ -486,7 +667,7 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     //  main.py                  1.2 GB   2022-05
     //  utils.py                 985 B    2021-12
     // 
-    //  :openwithvim                   /py 
+    //  :?!@>/openwithvim                   /py 
     //  ___________________________________________
     
     // | <- fill -> |
@@ -500,14 +681,20 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     // | <- fill -> | 10 (cursor sometimes) |
     // | <- fill -> |
     
-    // m.mode == filter?
+    // width of these two attribute columns, assuming ascii chars
+    const SIZE_MAX_COLS : usize = 10;
+    const DATE_MAX_COLS : usize = 14;
+
+    let name_header = format!(" Name {} ", sort_indicator(SortAttribute::Name, m.cwd_sort));
+    let size_header = format!(" Size {}   ", sort_indicator(SortAttribute::Size, m.cwd_sort));
+    let date_header = format!("  Modified {}  ", sort_indicator(SortAttribute::Date, m.cwd_sort));
     let divider : &str = &"-".repeat(m.cols);
     queue!(stdout, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
     queue!(stdout, MoveTo(0, 2), Print(divider));
     queue!(stdout, MoveTo(0, 3), 
-           fit(" Name ", m.cols - 8 - 10),
-           fit(" Size ", 8),
-           fit(" Modified ", 10),
+           fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS),
+           fit(&size_header, SIZE_MAX_COLS),
+           fit(&date_header, DATE_MAX_COLS),
     );
     queue!(stdout, MoveTo(0, 4), Print(divider));
 
@@ -527,7 +714,9 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
         // itemhighlighted?
         queue!(stdout,
                MoveTo(1, (rowNum).try_into().unwrap()),
-               fit(&entry.name, m.cols - 8 - 10),
+               fit(&entry.name, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS),
+               fit(&entry.size, SIZE_MAX_COLS),
+               fit(&entry.date, DATE_MAX_COLS),
         );
         if i == 0 { queue!(stdout, ResetColor); }
     }
@@ -550,6 +739,15 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     match m.mode {
         Mode::Filter => queue!(stdout, crossterm::cursor::Show,),
         _ => queue!(stdout, crossterm::cursor::Hide,),
+    };
+}
+
+fn sort_indicator(match_attribute: SortAttribute, current_sort: SortBy) -> &'static str {
+    if match_attribute != current_sort.attribute { return " "; }
+
+    return match current_sort.ascending {
+        true => "v",
+        false => "^",
     };
 }
 
