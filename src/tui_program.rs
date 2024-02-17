@@ -1,4 +1,4 @@
-// mini framework for application lifecycle and terminal display
+// mini functional framework for application lifecycle and terminal display
 
 #![allow(unused_variables)]
 #![allow(unused_imports)]
@@ -38,18 +38,19 @@ impl<Init, View, Update> Program<Init, View, Update> {
         let Self {init, view, update} = self;
         let mut stdout = stdout();
 
-        // disables some behavior like line wrapping and catching Enter presses: https://docs.rs/crossterm/latest/crossterm/terminal/index.html#raw-mode
+        // disables some behavior like line wrapping and catching Enter presses
+        // because i will handle those myself
+        // https://docs.rs/crossterm/latest/crossterm/terminal/index.html#raw-mode
         terminal::enable_raw_mode(); 
         queue!(stdout, 
                terminal::EnterAlternateScreen,
                terminal::DisableLineWrap,
                crossterm::cursor::Hide,
-               crossterm::cursor::EnableBlinking, // to signify focus in filter mode; will be hidden anyways in other modes
+               crossterm::cursor::EnableBlinking, // for indicating focus of text inputs; cursor will be hidden anyways in other modes
         );
 
         let mut model = init();
         view(&model, &mut stdout);
-        // display(&mut stdout, view(&model));
         stdout.flush();
 
         loop {
@@ -59,7 +60,6 @@ impl<Init, View, Update> Program<Init, View, Update> {
             }
             queue!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
             view(&model, &mut stdout);
-            // display(&mut stdout, view(&model));
             stdout.flush();
         }
 
@@ -71,14 +71,3 @@ impl<Init, View, Update> Program<Init, View, Update> {
         terminal::disable_raw_mode(); 
     }
 }
-
-// fn display(stdout: &mut std::io::Stdout, content: String) {
-//     // queue!(stdout, MoveTo(0, 0), Print(view(&model)),);
-// 
-//     let mut i = 0;
-//     let lines = content.split("\n");
-//     for line in lines {
-//         queue!(stdout, MoveTo(0, i), Print(line),);
-//         i += 1;
-//     }
-// }

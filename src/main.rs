@@ -1,5 +1,4 @@
 // fmin, a temrinal file manager inspired by fman + vim
-// and might be like midnight commander too
 
 #![allow(unused_variables)]
 #![allow(unused_imports)]
@@ -51,11 +50,8 @@ struct Model {
     rows: usize,
 }
 enum Mode {
-    // when filter input box is focused. could be empty but still have focused. can still exec
-    // other comamnds with control characters
     Filter,
     Normal,
-    Jump,
     // CommandPalette,
 }
 
@@ -65,8 +61,7 @@ enum Action {
     SetFilterText(String),
     SelectFirstEntry,
     StartFilterMode,
-    StartJumpMode,
-    SortBy(SortAttribute),
+    ChangeSortOrder(EntryAttribute),
     ReverseSort,
     // StartCommandPaletteMode,
     Noop,
@@ -74,7 +69,7 @@ enum Action {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-enum SortAttribute {
+enum EntryAttribute {
     Name,
     Size,
     Date,
@@ -82,7 +77,7 @@ enum SortAttribute {
 
 #[derive(Copy, Clone)]
 struct SortBy {
-    attribute: SortAttribute,
+    attribute: EntryAttribute,
     ascending: bool,
 }
 
@@ -90,9 +85,9 @@ struct Entry {
     path: PathBuf,
     is_dir: bool,
     name: FileName,
-    // on maybe(date) and maybe(size):
+    // concerning maybe(date) and maybe(size):
     // dirs dont have filesize - maybe count num of items in dir and display that instead? even recursively?
-    // also for permission errors, like window sspeical folder $recyclebin probably wont give you
+    // also for permission errors or special folders like $recyclebin - probably wont give you
     // any metadata about size or date modified
     size: Option<FileSize>,
     date: Option<FileDate>, 
@@ -173,6 +168,7 @@ impl Display for FileName {
 
 impl Display for FileSize {
     // formatting options to explore:
+    //
     // 1) two sig figs / digits, like
     // 0 - 99 B
     // 0.1 - 9.9, 10 - 99
@@ -182,7 +178,8 @@ impl Display for FileSize {
     // 1.5 KB
     //  27 MB
     // 0.9 GB
-    // 3) or 3 sig figs, like
+    //
+    // 2) or 3 sig figs, like
     // 0-999 B
     // 1.00 - 9.99
     // 10.0 - 99.9
@@ -193,14 +190,44 @@ impl Display for FileSize {
     //  514 KB
     // 87.2 MB
     // 2.31 GB
+    //
+    // 2.5) or just dont use decimals at all
+    //
     // 3) copy how ls -lh does it
+    //
     // 4) use standard behavior from bytes crate, like
     // "999.99 GB"  "1 B"
-    // which is max 9 chars, min 3
+    // which is max 9 chars, min 3. not sure of the formatting alogorithm tho.
+    //
+    // 5) do like windows file explorer, everything just in kb...
+    // 78,696 KB
+    // 890 KB
+    // 7 KB
+    //
+    // also note KB vs kb vs KiB vs Kb vs kB... just go with the all caps powers of 10 i think
+
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        // this is currently option 4)
-        // i want to try option 2) though
-        write!(f, "{}", Byte::from_bytes(self.0.into()).get_appropriate_unit(false).to_string())
+        let num_bytes = self.0;
+        let num_digits = ((num_bytes as f64).log10() + 1.) as usize; // u64.ilog10 would make sense if my rust version was a bit newer
+        let digits_after_decimal = (3 - (num_digits % 3)) % 3; // long winded negative modulus, to determine precision
+        match num_digits {
+            d if d < 4 => {
+                write!(f, "{} B", num_bytes)
+            },
+            d if d < 7 => {
+                write!(f, "{0:.1$} K", num_bytes as f64 / 1000., digits_after_decimal)
+            },
+            d if d < 10 => {
+                write!(f, "{0:.1$} M", num_bytes as f64 / 1000000., digits_after_decimal)
+            },
+            d if d < 13 => {
+                write!(f, "{0:.1$} G", num_bytes as f64 / 1000000000., digits_after_decimal)
+            },
+            _ => write!(f, "over 1 T")
+        }
+
+        // let byte = Byte::from_bytes(self.0.into()).get_appropriate_unit(false);
+        // write!(f, "{}", byte)
     }
 }
 
@@ -244,6 +271,7 @@ impl Display for FileDate {
     //
     // 4) "10/10/10" max 9 chars
     // %-m/%-d/%y
+    
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         let now = Local::now();
         let modified = self.0;
@@ -259,7 +287,7 @@ impl Display for FileDate {
 impl SortBy {
     pub fn compare_entries(&self, a: &Entry, b: &Entry) -> Ordering {
         match &self.attribute {
-            SortAttribute::Name => {
+            EntryAttribute::Name => {
                 if a.is_dir && !b.is_dir {
                     return Ordering::Less;
                 }
@@ -268,7 +296,7 @@ impl SortBy {
                 }
                 return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
             },
-            SortAttribute::Size => {
+            EntryAttribute::Size => {
                 match (&a.size, &b.size) {
                     (None, Some(b)) => Ordering::Less,
                     (Some(a), None) => Ordering::Greater,
@@ -277,7 +305,7 @@ impl SortBy {
                     _ => Ordering::Equal,
                 }
             }
-            SortAttribute::Date => {
+            EntryAttribute::Date => {
                 match (&a.date, &b.date) {
                     (None, Some(b)) => Ordering::Less,
                     (Some(a), None) => Ordering::Greater,
@@ -297,10 +325,10 @@ impl std::fmt::Debug for Entry {
 }
 
 impl std::convert::From<DirEntry> for Entry {
-    // todo: metadata unwrap() fail, likely unauthorized special windows folders
-    // to reproduce: read_entries(/mnt/c)
+    // are there permission errors that could happen here?
     fn from(oldentry: DirEntry) -> Self {
         let path = oldentry.path();
+        // TOOD: learn what filename errors are possible, then handle them
         let mut name = path.file_name().unwrap().to_str().unwrap().to_string();
         let is_dir = path.is_dir();
         let mut size_bytes = None;
@@ -321,7 +349,8 @@ impl std::convert::From<DirEntry> for Entry {
         };
         if is_dir {
             name = format!("{}/", name);
-            // size of dir just returns size of os-dir file object thingy, which is not useful
+            // dir.metadata.len just returns size of os-dir file object thingy, which is not useful
+            // its not actually related to size of contents
             size_bytes = None;
         }
         Self {
@@ -333,6 +362,12 @@ impl std::convert::From<DirEntry> for Entry {
         }
     }
 }
+
+// fn read_directory_contents(dir, sort) -> Vec<Entry> // read into sorted list, where sorted list
+// will be source of truth in model
+
+// fn read_directory_quickly(dir, sort) -> Vec<PathBuf> // not reading metadata, but only enough to
+// display names for an in-progress view. TODO - measure time to read metadata.size/date
 
 fn read_entries(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
     match dir.read_dir() {
@@ -363,12 +398,13 @@ fn main() {
 fn init() -> Model {
     let cwd = std::env::current_dir().unwrap();
     // let cwd = PathBuf::from("/mnt/c/Users");
-    let sort = SortBy{ attribute: SortAttribute::Name, ascending: true };
+    let sort = SortBy{ attribute: EntryAttribute::Name, ascending: true };
     let all_entries = read_entries(&cwd, sort);
     let sorted_entries = sort_entries(&all_entries, sort);
     let (cols, rows) = match terminal::size() {
         Ok((cols, rows)) => (usize::from(cols), usize::from(rows)),
-        // TODO: response to error of not knowing terminal size
+        // TODO: respond to error of not knowing terminal size ("give up, you dont have what fmin
+        // needs" ?)
         Err(err) => (0,0)
     };
 
@@ -422,7 +458,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                 Event::Key(keyevent) => {
                     match keyevent.code {
                         KeyCode::Char('/') => Action::StartFilterMode,
-                        KeyCode::Char('>') => Action::StartJumpMode, // maybe @ would work?
+                        // KeyCode::Char('>') => Action::StartJumpMode, // maybe @ would work?
                         // KeyCode::Char('?') => Action::StartCommandPaletteMode,
                         KeyCode::Backspace => {
                             match m.cwd.parent() {
@@ -432,28 +468,23 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                         },
                         KeyCode::Char('n') => {
                             match m.cwd_sort.attribute {
-                                SortAttribute::Name => Action::ReverseSort,
-                                _ => Action::SortBy(SortAttribute::Name),
+                                EntryAttribute::Name => Action::ReverseSort,
+                                _ => Action::ChangeSortOrder(EntryAttribute::Name),
                             }
                         },
                         KeyCode::Char('s') => {
                             match m.cwd_sort.attribute {
-                                SortAttribute::Size => Action::ReverseSort,
-                                _ => Action::SortBy(SortAttribute::Size),
+                                EntryAttribute::Size => Action::ReverseSort,
+                                _ => Action::ChangeSortOrder(EntryAttribute::Size),
                             }
                         },
-                        KeyCode::Char('d') => {
+                        KeyCode::Char('m') => {
                             match m.cwd_sort.attribute {
-                                SortAttribute::Date => Action::ReverseSort,
-                                _ => Action::SortBy(SortAttribute::Date),
+                                EntryAttribute::Date => Action::ReverseSort,
+                                _ => Action::ChangeSortOrder(EntryAttribute::Date),
                             }
                         },
-                        // KeyCode::Char('j') => {
-                        //     match keyevent.modifiers {
-                        //         KeyModifiers::CONTROL => Action::StartJumpMode,
-                        //         _ => Action::Noop,
-                        //     }
-                        // },
+                        KeyCode::Enter => Action::SelectFirstEntry,
                         KeyCode::Char('q') => Action::Quit,
                         _ => Action::Noop,
                     }
@@ -471,12 +502,6 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                     // so probably not worth including that extra dependency
                     match keyevent.code {
                         KeyCode::Esc => Action::SetFilterText("".to_string()),
-                        // KeyCode::Char('j') => {
-                        //     match keyevent.modifiers {
-                        //         KeyModifiers::CONTROL => Action::StartJumpMode,
-                        //         _ => Action::SetFilterText(format!("{}j", m.filter_text)),
-                        //     }
-                        // },
                         KeyCode::Char(c) => {
                             Action::SetFilterText(format!("{}{}", m.filter_text, c))
                         },
@@ -508,17 +533,6 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                 _ => Action::Noop,
             }
         },
-        Mode::Jump => {
-            match terminal_event {
-                Event::Key(keyevent) => {
-                    match keyevent.code {
-                        KeyCode::Esc => Action::SetFilterText("".to_string()),
-                        _ => Action::Noop,
-                    }
-                },
-                _ => Action::Noop,
-            }
-        },
     };
     // update state
     match action {
@@ -527,7 +541,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
             m.mode = Mode::Filter;
             m.cwd = pathbuf;
-            m.cwd_sort = SortBy { attribute: SortAttribute::Name, ascending: true };
+            m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
             Some(())
         },
         Action::SetFilterText(text) => {
@@ -551,13 +565,13 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                     m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
                     m.mode = Mode::Filter;
                     m.filter_text = "".to_string();
-                    m.cwd_sort = SortBy { attribute: SortAttribute::Name, ascending: true };
+                    m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
                     Some(())
                 },
                 None => Some(()),
             }
         },
-        Action::SortBy(attribute) => {
+        Action::ChangeSortOrder(attribute) => {
             m.cwd_sort.attribute = attribute;
             m.cwd_sort.ascending = true;
             // m.cwd_sort = SortBy { attribute: attribute, ascending: true };
@@ -574,21 +588,17 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             m.mode = Mode::Filter;
             Some(())
         },
-        Action::StartJumpMode => {
-            m.mode = Mode::Jump;
-            Some(())
-        },
         Action::Noop => Some(()),
         Action::Quit => None,
     }
 }
 
-// UI AND DIRTY STRING HANDLING BELOW
+// UI AND MESSY STRING HANDLING BELOW
 
 fn view(m: &Model, stdout: &mut std::io::Stdout) {
-    // must be impure function writing to mutable buf stdout
+    // view must be impure function writing to mutable buf stdout
     // since crossterm lib puts control bytes in custom types like SetBackgroundColor
-    // that must be used here in impure queue!(buf, ...) function
+    // that must be used here in queue!(buf, ...) function
     // and not postponed for agnostic model/update/view loop
     //
     // maybe i can send a list of crossterm::Commands to queue...
@@ -597,7 +607,7 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     // just for the sake of 'purity'
 
     // half-declarative view, without implementing a whole ui framework
-    // hinges on having only one stretch box horiz and vert - rest are static sizes
+    // hinges on having only one flex span horiz and vert - rest are static sizes
 
     //  C:\users\jkwon\desktop\programming\modenv
     //  ___________________________________________
@@ -627,24 +637,28 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     // | <- fill -> |
     
     // width of attribute columns, assuming ascii chars, based on desired formatted output and what
-    // looks ok, including margins
-    const SIZE_MAX_COLS : usize = 11;
+    // looks nice imo
+    const SIZE_MAX_COLS : usize = 7;
     const DATE_MAX_COLS : usize = 14;
+    const MARGIN_COLS : usize = 2;
+    const MARGIN : &str = "  ";
 
-    let name_header = format!(" Name {} ", sort_indicator(SortAttribute::Name, m.cwd_sort));
-    let size_header = format!(" Size {}   ", sort_indicator(SortAttribute::Size, m.cwd_sort));
-    let date_header = format!("  Modified {}  ", sort_indicator(SortAttribute::Date, m.cwd_sort));
+    // -- HEADERS -- //
+    let name_header = format!(" Name {}", sort_indicator(EntryAttribute::Name, m.cwd_sort));
+    let size_header = format!("Size {} ", sort_indicator(EntryAttribute::Size, m.cwd_sort));
+    let date_header = format!("  Modified {}  ", sort_indicator(EntryAttribute::Date, m.cwd_sort));
     let divider : &str = &"-".repeat(m.cols);
     queue!(stdout, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
     queue!(stdout, MoveTo(0, 2), Print(divider));
     queue!(stdout, MoveTo(0, 3), 
-           fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS),
+           fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - MARGIN_COLS),
+           Print(MARGIN),
            fit(&size_header, SIZE_MAX_COLS),
            fit(&date_header, DATE_MAX_COLS),
     );
     queue!(stdout, MoveTo(0, 4), Print(divider));
 
-    // middle rows, stretch to fill
+    // -- MIDDLE -- //
     let filtered_entries = m.sorted_entries
         .clone()
         .into_iter()
@@ -660,21 +674,24 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
         if i == 0 { queue!(stdout, SetBackgroundColor(Color::DarkGrey)); }
         // itemhighlighted?
         queue!(stdout,
-               MoveTo(1, (rowNum).try_into().unwrap()),
-               fit(&entry.name, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS),
-               fit(&entry.size, SIZE_MAX_COLS),
+               MoveTo(0, (rowNum).try_into().unwrap()),
+               Print(" "),
+               fit(&entry.name, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - 2 * MARGIN_COLS),
+               Print(MARGIN),
+               fit( &pad_align_right(&entry.size, SIZE_MAX_COLS), SIZE_MAX_COLS),
+               Print(MARGIN),
                fit(&entry.date, DATE_MAX_COLS),
         );
         if i == 0 { queue!(stdout, ResetColor); }
     }
 
+    // -- FOOTER -- //
     queue!(stdout, MoveTo(0, (m.rows - 2).try_into().unwrap()), Print(divider));
     queue!(stdout, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
            Print(&format!(" {} {}",
                         match m.mode {
                             Mode::Filter => "(filter)",
                             Mode::Normal => "(normal)",
-                            Mode::Jump => "(jump to)",
                         },
                         match m.mode {
                             Mode::Filter => format!(" /{}", m.filter_text),
@@ -689,7 +706,7 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     };
 }
 
-fn sort_indicator(match_attribute: SortAttribute, current_sort: SortBy) -> &'static str {
+fn sort_indicator(match_attribute: EntryAttribute, current_sort: SortBy) -> &'static str {
     if match_attribute != current_sort.attribute { return " "; }
 
     return match current_sort.ascending {
@@ -707,8 +724,7 @@ fn fit_to_length(s: &str, final_length: usize) -> String {
     match str_length(s) {
         // too short
         length if length <= final_length => {
-            let padding = " ".repeat(final_length - length);
-            format!("{}{}", s, padding)
+            pad_align_left(s, final_length)
         },
         // too long
         length => {
@@ -723,3 +739,11 @@ fn str_length<S: AsRef<str>> (s: S) -> usize {
     return s.as_ref().chars().count();
 }
 
+fn pad_align_left(s: &str, final_length: usize) -> String {
+    // pad string$0 with : spaces, left aligned <, to meet final_length$1
+    format!("{0: <1$}", s, final_length) 
+}
+
+fn pad_align_right(s: &str, final_length: usize) -> String {
+    format!("{0: >1$}", s, final_length) 
+}
