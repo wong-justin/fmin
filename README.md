@@ -6,23 +6,23 @@ a terminal file manager, inspired by fman
 
 ## build
 
-rustc --version 1.65.0 or newer
+`rustc --version 1.65.0` or newer
 
-cargo build
+`cargo build`
 
 ## roadmap / todo
 
-overall goal 1: quick, convenient directory navigator.
+**goal 1**: quick, convenient directory navigator.
 
-then goal 2: file management commands like copy/paste.
+**goal 2**: file management commands like copy/paste, along with custom commands
 
 0. bugfix: have sorted entries as source of truth; stop referencing randomly sorted hashset
 
 1. move up and down in entry list, incl arrow keys in filter mode and `j/k` in normal mode. which means implementing flexible list view.
 
-2. `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
+2. implement jumptodir feature by tracking frecency in flat file db
 
-3. implement jumptodir feature by tracking frecency in flat file db
+3. `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
 
 ## other important things to do
 
