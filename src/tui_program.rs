@@ -65,6 +65,7 @@ impl<Init, View, Update> Program<Init, View, Update> {
 
         // cleanup and be a good citizen so the terminal behaves normally afterwards (eg. start catching ctrl+c again, and show cursor)
         execute!(stdout, 
+                 terminal::EnableLineWrap,
                  terminal::LeaveAlternateScreen,
                  crossterm::cursor::Show,
         );
