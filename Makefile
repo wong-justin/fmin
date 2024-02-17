@@ -1,4 +1,5 @@
 build: src/*.rs
+	@cargo build
 
 .PHONY: livereload
 dev:
