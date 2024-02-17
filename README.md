@@ -24,8 +24,9 @@ a terminal file manager, inspired by fman
 
 3. `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
 
-## other important things to do
+<summary>## other important things to do</summary>
 
+<details>
 - cd shell session to last dir when exiting fmin. see: https://github.com/dylanaraps/fff?tab=readme-ov-file#fish
 
 - clear jumptodir history eventually.. after 90days? after ranking score is at minimum? give script to clear all with minimum possible ranking score of 1 for user to manually execute (probs as one of the .sh functions to import intop command palette?)
@@ -73,9 +74,11 @@ second step will read metadata date and size and calc display. also note im doin
 - also consider caching large dir results, and having filewatcher processes knowing when to clear the cache id the dir is modified
 
 - dual pane? or N-pane, with client/server architecture? where server just holds yanked filepaths... kinda overkill. maybe connect with unix pipes? also consider multiplatform... maybe cli option `--pair-with-session` to opt in to a dual pane? --pair-with-last, --print-all-session-ids, --start-background-server
+</details>
 
-## nice-to-haves, eventually
+<summary>## nice-to-haves, eventually</summary>
 
+<details>
 - make sure network filesystems work, like google drive or nas'es
 
 - icons, like nerdfont, or at least ascii chars, just to add redundancy to make visually identifying files easier (.py, directories, .md, source code, plaintext, binaries, etc)
@@ -134,9 +137,11 @@ like use `display::CompactWidth/Condensed/Comfortable` if name_col is less than 
 - consider caching Format trait on Date and Size, in case it helps
 
 - looks like windows build has screen flicker each redraw - sad. at least theres always wsl. probably fixable by rewriting view to do partical screen updates instead of redraws top to bottom. also tiny windows interesting thing - looks like terminal height returns one less row than wsl/linux terminal height - maybe windows forces an extra blank line at the end
+</details>
 
-## other thoughts
+<summary>## other thoughts</summary>
 
+<details>
 - remember to have confirmation step before perofrming action that modifies filesyystem (eg. `move 10 files to new/dir/? [y/n]`)
 or alternatively make it easy to undo
 or alternatively harder to perform on accident, eg. not a simple keypress in normal mode, esp since its easy to think youre in filter mode by mistake
@@ -158,6 +163,7 @@ the main ones:
 	- feedback on file operations
 	- remember sort order for dirs
 	- undo for commands rename/copy/delete
+</details>
 
 ## feedback; can you help by answering these questions for me?
 
