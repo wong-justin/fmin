@@ -24,9 +24,9 @@ a terminal file manager, inspired by fman
 
 3. `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
 
+<details>
 <summary>## other important things to do</summary>
 
-<details>
 - cd shell session to last dir when exiting fmin. see: https://github.com/dylanaraps/fff?tab=readme-ov-file#fish
 
 - clear jumptodir history eventually.. after 90days? after ranking score is at minimum? give script to clear all with minimum possible ranking score of 1 for user to manually execute (probs as one of the .sh functions to import intop command palette?)
@@ -76,9 +76,9 @@ second step will read metadata date and size and calc display. also note im doin
 - dual pane? or N-pane, with client/server architecture? where server just holds yanked filepaths... kinda overkill. maybe connect with unix pipes? also consider multiplatform... maybe cli option `--pair-with-session` to opt in to a dual pane? --pair-with-last, --print-all-session-ids, --start-background-server
 </details>
 
+<details>
 <summary>## nice-to-haves, eventually</summary>
 
-<details>
 - make sure network filesystems work, like google drive or nas'es
 
 - icons, like nerdfont, or at least ascii chars, just to add redundancy to make visually identifying files easier (.py, directories, .md, source code, plaintext, binaries, etc)
@@ -139,9 +139,9 @@ like use `display::CompactWidth/Condensed/Comfortable` if name_col is less than 
 - looks like windows build has screen flicker each redraw - sad. at least theres always wsl. probably fixable by rewriting view to do partical screen updates instead of redraws top to bottom. also tiny windows interesting thing - looks like terminal height returns one less row than wsl/linux terminal height - maybe windows forces an extra blank line at the end
 </details>
 
+<details>
 <summary>## other thoughts</summary>
 
-<details>
 - remember to have confirmation step before perofrming action that modifies filesyystem (eg. `move 10 files to new/dir/? [y/n]`)
 or alternatively make it easy to undo
 or alternatively harder to perform on accident, eg. not a simple keypress in normal mode, esp since its easy to think youre in filter mode by mistake
@@ -165,7 +165,7 @@ the main ones:
 	- undo for commands rename/copy/delete
 </details>
 
-## feedback; can you help by answering these questions for me?
+## feedback welcome; also some questions im wondering about
 
 - what are all the options for reading user-defined shell functions during runtime? see also: https://clig.dev/#configuration
 
@@ -180,7 +180,7 @@ maybe command-line options on start? `fmin --cmd-open=/path/to/open.sh --cmd-ope
 
 that would get ugly quick tho. and poor design because cli options are designed for config that changes often "from one invocation of the command to the next", whereas these shell functions should be reused every launch.
 
-- crossterm lib uses `u16` for functions like MoveTo(), etc. but some other functions use `usize`. is `usize::from()`ing the u16s as early as possible, and `usize.try_into().unwrap()` the best way to go? smells a little fishy. and is it wrong to prefer the `usize` as the truer type represnetation of an "unlimited" unsigned int, compared to `u16` which feels like an arbitray limit? and has anyone ever needed a terminal sized more than 65536 chars wide/rows tall?
+- crossterm lib uses `u16` for functions like MoveTo(), etc. but some other functions use `usize`. is `usize::from()`ing the u16s as early as possible, and `usize.try_into().unwrap()` the best way to go? smells unclean. and is it wrong to prefer the `usize` as the truer type represnetation of an "unlimited" unsigned int, compared to `u16` which feels like an arbitray limit? and has anyone ever needed a terminal sized more than 65536 chars wide/rows tall?
 
 - how do non-american keyboards use vim hotkeys and other ascii char usecases, eg. WASD for games? will those keyboards still be able to input a-z,ctrl+[a-z],shift+[a-z] easily? do power users usually have a qwerty remap layer for these kinds of programs?
 
