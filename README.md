@@ -1,6 +1,6 @@
 # fmin
 
-a terminal file manager, inspired by fman
+A terminal file manager inspired by [fman](https://fman.io/)
 
 ![screenshot](./demo/screenshot.png)
 
@@ -10,11 +10,21 @@ a terminal file manager, inspired by fman
 
 `cargo build`
 
+## Installation
+
+only once fmin becomes stable, at least after finishing goal 1
+
+## Usage
+
+see `main.rs::update()` for keybindings
+
 ## Roadmap / To-do
 
-**goal 1**: quick, convenient directory navigator.
+**Goal 1**: quick, convenient directory navigator.
 
-**goal 2**: file management commands like copy/paste, along with custom commands
+**Goal 2**: file management commands like copy/paste, along with custom commands
+
+---
 
 0) bugfix: have sorted entries as source of truth; stop referencing randomly sorted hashset
 
@@ -23,6 +33,8 @@ a terminal file manager, inspired by fman
 2) implement jumptodir feature by tracking frecency in flat file db
 
 3) `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
+
+--- 
 
 <details>
 <summary>other important things to do</summary>
@@ -180,7 +192,7 @@ maybe command-line options on start? `fmin --cmd-open=/path/to/open.sh --cmd-ope
 
 that would get ugly quick tho. and poor design because cli options are designed for config that changes often "from one invocation of the command to the next", whereas these shell functions should be reused every launch.
 
-- crossterm lib uses `u16` for functions like MoveTo(), etc. but some other functions use `usize`. is `usize::from()`ing the u16s as early as possible, and `usize.try_into().unwrap()` the best way to go? smells unclean. and is it wrong to prefer the `usize` as the truer type represnetation of an "unlimited" unsigned int, compared to `u16` which feels like an arbitray limit? and has anyone ever needed a terminal sized more than 65536 chars wide/rows tall?
+- crossterm lib uses `u16` for functions like MoveTo(), etc. but some other functions use `usize`. is `usize::from()`ing the u16s as early as possible and `usize.try_into().unwrap()`ing the best way to go? smells unclean. and is it wrong to prefer the `usize` as the truer type represnetation of an "unlimited" unsigned int, compared to `u16` which feels like an arbitray limit? and has anyone ever needed a terminal sized more than 65536 chars wide/rows tall?
 
 - how do non-american keyboards use vim hotkeys and other ascii char usecases, eg. WASD for games? will those keyboards still be able to input a-z,ctrl+[a-z],shift+[a-z] easily? do power users usually have a qwerty remap layer for these kinds of programs?
 
