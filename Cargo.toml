@@ -3,7 +3,7 @@ name = "fmin"
 description = "A terminal file manager, inspired by fman"
 version = "0.3.0"
 edition = "2021"
-authors = "Justin Wong <justin@wonger.dev>"
+authors = ["Justin Wong <justin@wonger.dev>"]
 rust-version = "1.65.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
