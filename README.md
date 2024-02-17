@@ -4,6 +4,12 @@ a terminal file manager, inspired by fman + vim
 
 looks a little like midnight commander too
 
+## build
+
+rustc --version 1.65.0 or newer
+
+cargo run or cargo build
+
 ## roadmap / todo
 
 overall goal 1: quick, convenient directory navigator. then goal 2: file management commands like copy/paste. then stability and edge cases and fine tuning
@@ -90,6 +96,8 @@ or consider also zero cli options, and all config happens in env vars
 
 - other plugin function ideas: print width/height for img/video files, duration of audio/video files, batch rename selected? (eg. img_01, img_02, etc), copy cwd abs path to clipboard
 
+- for batch rename, consider opening vim/$editor buffer to let user macro their own filename pattern edits. thats what this file manager does in their demo video: https://github.com/sxyazi/yazi
+
 - keep command palette context dependent, eg. show up/down navigation in normal mode, but hide those and show others like esc keybind for filter mode
 
 - add filewatcher to cwd so tui live updates when files are added/removed/modified
@@ -120,6 +128,8 @@ like use display::CompactWidth/Condensed/Comfortable if name_col is less than si
 - consider leader key + normal keypress, where user can define leader key, which works well for sxiv tool (see https://youtu.be/GYW9i_u5PY://youtu.be/GYW9i_u5PYs) 
 
 - consider caching Format trait on Date and Size, in case it helps
+
+- looks like windows build has screen flicker each redraw - sad. at least theres always wsl. probably fixable by rewriting view to do partical screen updates instead of redraws top to bottom. also tiny windows interesting thing - looks like terminal height returns one less row than wsl/linux terminal height - maybe windows forces an extra blank line at the end
 
 ## other thoughts
 
