@@ -10,7 +10,7 @@ a terminal file manager, inspired by fman
 
 `cargo build`
 
-## Roadmap / todo
+## Roadmap / To-do
 
 **goal 1**: quick, convenient directory navigator.
 
@@ -25,7 +25,7 @@ a terminal file manager, inspired by fman
 3) `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
 
 <details>
-<summary>** other important things to do **</summary>
+<summary>other important things to do</summary>
 
 - cd shell session to last dir when exiting fmin. see: https://github.com/dylanaraps/fff?tab=readme-ov-file#fish
 
@@ -77,7 +77,7 @@ second step will read metadata date and size and calc display. also note im doin
 </details>
 
 <details>
-<summary>** nice-to-haves, eventually **</summary>
+<summary>nice-to-haves, eventually</summary>
 
 - make sure network filesystems work, like google drive or nas'es
 
@@ -140,7 +140,7 @@ like use `display::CompactWidth/Condensed/Comfortable` if name_col is less than 
 </details>
 
 <details>
-<summary>** other thoughts **</summary>
+<summary>other thoughts</summary>
 
 - remember to have confirmation step before perofrming action that modifies filesyystem (eg. `move 10 files to new/dir/? [y/n]`)
 or alternatively make it easy to undo
