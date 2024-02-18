@@ -204,30 +204,41 @@ impl Display for FileSize {
     // 890 KB
     // 7 KB
     //
+    // 6) always go with 1 decimal precision
+    // 7 max char widths
+    // 4 B
+    // 1.5 K
+    // 900.1 M
+    // 27.9 G
+    // which is good to be more consistent and therefore more readable than varying decimal places
+    //
     // also note KB vs kb vs KiB vs Kb vs kB... just go with the all caps powers of 10 i think
 
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        const SUFFIXES : [&str; 4] = ["G", "M", "K", "B"];
+        const MAGNITUDES : [u64; 4] = [
+            u64::pow(10,9),
+            u64::pow(10,6),
+            u64::pow(10,3),
+            1
+        ];
+
         let num_bytes = self.0;
-        let num_digits = ((num_bytes as f64).log10() + 1.) as usize; // u64.ilog10 would make sense if my rust version was a bit newer
-        let digits_after_decimal = (3 - (num_digits % 3)) % 3; // long winded negative modulus, to determine precision
-        match num_digits {
-            d if d < 4 => {
+        match num_bytes {
+            b if b < u64::pow(10,3) => { 
                 write!(f, "{} B", num_bytes)
             },
-            d if d < 7 => {
-                write!(f, "{0:.1$} K", num_bytes as f64 / 1000., digits_after_decimal)
+            b if b >= u64::pow(10,12) => {
+                write!(f, "over 1 TB")
             },
-            d if d < 10 => {
-                write!(f, "{0:.1$} M", num_bytes as f64 / 1000000., digits_after_decimal)
+            _ => {
+                let mut i = 0;
+                while MAGNITUDES[i] > num_bytes {
+                    i += 1;
+                }
+                write!(f, "{:.1} {}", num_bytes as f64 / MAGNITUDES[i] as f64, SUFFIXES[i])
             },
-            d if d < 13 => {
-                write!(f, "{0:.1$} G", num_bytes as f64 / 1000000000., digits_after_decimal)
-            },
-            _ => write!(f, "over 1 T")
         }
-
-        // let byte = Byte::from_bytes(self.0.into()).get_appropriate_unit(false);
-        // write!(f, "{}", byte)
     }
 }
 

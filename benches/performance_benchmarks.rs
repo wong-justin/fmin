@@ -4,7 +4,8 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // note that sample file sizes ideally should match distribution of file sizes found on real
 // machines. probs not evenly or normally distributed; maybe clustered around 1KB and 1 MB ig I had to guess
-const EXAMPLE_BYTE_SIZES : [u64; 14] = [
+const EXAMPLE_BYTE_SIZES : [u64; 15] = [
+    0,
     9,
     99,
     999,
@@ -89,6 +90,9 @@ fn format_bytes_with_loop(num_bytes: u64) -> String {
     ];
 
     match num_bytes {
+        b if b < u64::pow(10,3) => { 
+            format!("{} B", num_bytes)
+        },
         b if b >= u64::pow(10,12) => {
             format!("over 1 TB")
         },
@@ -100,7 +104,6 @@ fn format_bytes_with_loop(num_bytes: u64) -> String {
             format!("{:.1} {}", num_bytes / MAGNITUDES[i], SUFFIXES[i])
         },
     }
-
 }
 
 fn compare_bytes_formatting(c: &mut Criterion) {
