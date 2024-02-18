@@ -12,7 +12,7 @@ A terminal file manager inspired by [fman](https://fman.io/)
 
 ## Installation
 
-only once fmin becomes stable, at least after finishing goal 1
+(while early development) `git clone https://github.com/wong-justin/fmin.git`
 
 ## Usage
 
@@ -20,7 +20,7 @@ see `main.rs::update()` for keybindings
 
 ## Roadmap / To-do
 
-**Goal 1**: quick, convenient directory navigator.
+**Goal 1**: quick, convenient directory navigation.
 
 **Goal 2**: file management commands like copy/paste, along with custom commands
 
@@ -82,10 +82,13 @@ ___________________________________________
 second step will read metadata date and size and calc display. also note im doing a math.log() call for size formatting... probably not helping. i just realized thats easily replaceable with a few `(x < 10? x < 100? x < 1000?)` cases - measure and make sure thats faster
 	- bonus points if program is still responsive to keypresses, especially between 1st and 2nd steps while metadata is loading
 	- MUST measure performance between both options tho - try creating perf test then git branch to test new implementation
+	- also, if i already have sorted vec<entry> and i know view_start and view_end, then i only need to format strings for entries between view_start and view_end before displaying, instead of formatting each entry in whole vec. also memoization will help if i structure the code to make repeat formatting calls
 
 - also consider caching large dir results, and having filewatcher processes knowing when to clear the cache id the dir is modified
 
 - dual pane? or N-pane, with client/server architecture? where server just holds yanked filepaths... kinda overkill. maybe connect with unix pipes? also consider multiplatform... maybe cli option `--pair-with-session` to opt in to a dual pane? --pair-with-last, --print-all-session-ids, --start-background-server
+
+- make sure all rust functions take borrowed struct params, unless they are supposed to take ownership after the function call
 </details>
 
 <details>
@@ -197,3 +200,5 @@ that would get ugly quick tho. and poor design because cli options are designed 
 - how do non-american keyboards use vim hotkeys and other ascii char usecases, eg. WASD for games? will those keyboards still be able to input a-z,ctrl+[a-z],shift+[a-z] easily? do power users usually have a qwerty remap layer for these kinds of programs?
 
 - any cleanish, faster alternatives to the model-update-view application loop that avoids writing so many bytes to stdout each update frame? the current way feels a tad slow. or maybe windows terminal is just getting too slow for me personally
+
+- is it possible / worth incorporating tools for fuzzy matching and frecency tracking, like [fzf](https://github.com/junegunn/fzf) and [z](https://github.com/rupa/z)? in my opinion, it seems like a pain to integrate those shell tools, between code interface and user setup/installation, compared to reimplementing the basic functionality in rust (eg. string substring match instead of fuzzy match)
