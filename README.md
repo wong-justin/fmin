@@ -1,6 +1,6 @@
 # fmin
 
-A terminal file manager inspired by [fman](https://fman.io/)
+A terminal file manager inspired by [fman](https://fman.io/).
 
 ![screenshot](./demo/screenshot.png)
 
@@ -12,13 +12,13 @@ A terminal file manager inspired by [fman](https://fman.io/)
 
 ## Installation
 
-(while early development) `git clone https://github.com/wong-justin/fmin.git`
+(while early development) `git clone https://github.com/wong-justin/fmin.git` then build
 
 ## Usage
 
 see `main.rs::update()` for keybindings
 
-## Roadmap / To-do
+## Roadmap / To-do / Brain dump
 
 **Goal 1**: quick, convenient directory navigation.
 
@@ -94,11 +94,13 @@ second step will read metadata date and size and calc display. also note im doin
 <details>
 <summary>nice-to-haves, eventually</summary>
 
-- make sure network filesystems work, like google drive or nas'es
+- make sure network filesystems work, like google drive or dropbox or nas'es
 
 - icons, like nerdfont, or at least ascii chars, just to add redundancy to make visually identifying files easier (.py, directories, .md, source code, plaintext, binaries, etc)
 
 - consider shift+m like a shift+click on windows, meaning select all from beginning mark up to cursor 
+
+- display idx/total item count in bottom right. also num selected items
 
 - potential cli/config options: `--start-jumping`, `--config-at`, `--history-at`, `--logs--at`
 along with types like `Config::starting_mode/logs_path/`...
@@ -107,6 +109,8 @@ or consider also zero cli options, and all config happens in env vars
 - have logs in the first place
 
 - include sortorder in history file as UX/QOL improvement, so fmin remembers your preferred sort order in each dir
+
+- some more fringe command ideas to consider for default palette (beyond move/cut, refresh, copy, delete, sort, select, select all): new file, new folder, rename. these could be outsourced to custom scripts/functions tho, esp if they're not used often
 
 - be able to delete directories in frecency list (rather than opening flat history db file and editing / deleting lines). Note that some dirs temporarily appear and disappear, like USBs, and those should never be deleted automatically just because they arent present at a certain moment
 
@@ -166,18 +170,19 @@ maybe keep those actions limited to command palette with no shortcut? move/copy/
 
 - also enjoy minimal keypresses, esp when coupled with minimal thinking - eg. ctrl+p one step shortcut to jump from any mode to command palette mode, rather than remembering page/modal navigation and esc -> colon:, two steps and extra keypress 
 
-- some command ideas for the palette: move/cut, refresh, copy, delete, sort, new file, new folder, rename, count items in cwd,
-
 - reminder to self that the UI is not as complex because no need for linewrapping - keep it that way 
 
 - look at fman issues, both open and closed, to see people's most desired features: https://github.com/fman-users/fman/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc
 the main ones:
 	- search (presumably recursively in cwd; low priority for me personally; could be a ls | grep command anyways; and text search is an rgrep command)
-	- batch rename
-	- commmand to compute directory size
+	- batch rename (this is rarer and could be outsourced to `$editor` where macro editing is optimized)
+	- commmand to compute directory size (this should be plugin script/function, not core)
 	- feedback on file operations
 	- remember sort order for dirs
-	- undo for commands rename/copy/delete
+	- undo for commands rename/copy/delete (probably difficult, and less important if these dont happen by accident. also if delete is aliased to `mv $trash`)
+
+- midnight commander has lots of arcane keybindings, including function keys all the way at the top of the keyboard, and a bit of chording; ideally the command palette is the opposite experience, that is, immediately understandable and productive, with minimal learning curve
+
 </details>
 
 ## feedback welcome; also some questions im wondering about
@@ -202,3 +207,9 @@ that would get ugly quick tho. and poor design because cli options are designed 
 - any cleanish, faster alternatives to the model-update-view application loop that avoids writing so many bytes to stdout each update frame? the current way feels a tad slow. or maybe windows terminal is just getting too slow for me personally
 
 - is it possible / worth incorporating tools for fuzzy matching and frecency tracking, like [fzf](https://github.com/junegunn/fzf) and [z](https://github.com/rupa/z)? in my opinion, it seems like a pain to integrate those shell tools, between code interface and user setup/installation, compared to reimplementing the basic functionality in rust (eg. string substring match instead of fuzzy match)
+
+- what sorts of file manager edge cases am I not anticipating beyond simple reading directories and files? so far i can think of symlinks, networked filesystems, read/write permissions, very large directories, very long file operations like copying hundreds of GBs, removable drives like USBs, ... I guess these things reveal themselves with users
+
+- how does this behave on mac? any weird directories or OS conventions or runtime errors?
+
+- what are popular/effective file size formats? like how many decimal places, digits, unit abbreviations. it seems like each file manager chooses a different display format. see `main.rs:: impl Display for FileSize` for formats I've found so far
