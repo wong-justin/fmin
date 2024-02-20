@@ -29,7 +29,7 @@ pub struct Program<Init, View, Update> {
 }
 
 impl<Init, View, Update> Program<Init, View, Update> {
-    pub fn run<Model>(self) 
+    pub fn run<Model>(self) -> Model
     where 
         Init: FnOnce() -> Model, 
         View: Fn(&Model, &mut std::io::Stdout),
@@ -70,5 +70,6 @@ impl<Init, View, Update> Program<Init, View, Update> {
                  crossterm::cursor::Show,
         );
         terminal::disable_raw_mode(); 
+        return model;
     }
 }

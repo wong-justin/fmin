@@ -403,7 +403,13 @@ fn read_entries(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
 
 fn main() {
     println!("");
-    Program {init, view, update}.run();
+    let final_model = Program {init, view, update}.run();
+    // set $FMIN_CWD = final_model.cwd.display()
+    // then tell user to alias fmin(*args) { fmin *args; cd $FMIN_CWD }
+    // or alias fmin = /thisrepo/script.sh
+    //
+    // cant pass cwd to stdout since thats where all the TUI bytes go as well
+    // print!("{}", final_model.cwd.display())
 }
 
 fn init() -> Model {
