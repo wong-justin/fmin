@@ -417,7 +417,7 @@ fn init() -> Model {
     let cwd = std::env::current_dir().unwrap();
     // let cwd = PathBuf::from("/mnt/c/Users");
     let sort = SortBy{ attribute: EntryAttribute::Name, ascending: true };
-    let all_entries = read_entries(&cwd, sort);
+    let all_entries = read_directory_contents(&cwd, sort);
     let sorted_entries = sort_entries(&all_entries, sort);
     let (cols, rows) = match terminal::size() {
         Ok((cols, rows)) => (usize::from(cols), usize::from(rows)),
@@ -555,7 +555,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
     // update state
     match action {
         Action::GotoDir(pathbuf) => {
-            m.all_entries = read_entries(&pathbuf, m.cwd_sort);
+            m.all_entries = read_directory_contents(&pathbuf, m.cwd_sort);
             m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
             m.mode = Mode::Filter;
             m.cwd = pathbuf;
@@ -579,7 +579,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             match first {
                 Some(entry) => {
                     m.cwd = entry.path.clone();
-                    m.all_entries = read_entries(&entry.path, m.cwd_sort);
+                    m.all_entries = read_directory_contents(&entry.path, m.cwd_sort);
                     m.sorted_entries = sort_entries(&m.all_entries, m.cwd_sort);
                     m.mode = Mode::Filter;
                     m.filter_text = "".to_string();
