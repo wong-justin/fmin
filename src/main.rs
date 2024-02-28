@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter, Error};
 use std::fs::DirEntry;
 use std::hash::{Hash, Hasher};
-use std::io::{stdout, Write};
+use std::io::{Write};
 use std::path::{Path, PathBuf};
 
 use byte_unit::Byte;
@@ -402,14 +402,15 @@ fn read_entries(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
 // APP LOGIC
 
 fn main() {
-    println!("");
+    // println!("");
     let final_model = Program {init, view, update}.run();
     // set $FMIN_CWD = final_model.cwd.display()
     // then tell user to alias fmin(*args) { fmin *args; cd $FMIN_CWD }
     // or alias fmin = /thisrepo/script.sh
     //
     // cant pass cwd to stdout since thats where all the TUI bytes go as well
-    // print!("{}", final_model.cwd.display())
+
+    print!("{}", final_model.cwd.display());
 }
 
 fn init() -> Model {
@@ -612,8 +613,8 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
 
 // UI AND MESSY STRING HANDLING BELOW
 
-fn view(m: &Model, stdout: &mut std::io::Stdout) {
-    // view must be impure function writing to mutable buf stdout
+fn view(m: &Model, stderr: &mut std::io::Stderr) {
+    // view must be impure function writing to mutable buf stderr
     // since crossterm lib puts control bytes in custom types like SetBackgroundColor
     // that must be used here in queue!(buf, ...) function
     // and not postponed for agnostic model/update/view loop
@@ -665,15 +666,15 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     let size_header = format!("Size {} ", sort_indicator(EntryAttribute::Size, m.cwd_sort));
     let date_header = format!("  Modified {}  ", sort_indicator(EntryAttribute::Date, m.cwd_sort));
     let divider : &str = &"-".repeat(m.cols);
-    queue!(stdout, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
-    queue!(stdout, MoveTo(0, 2), Print(divider));
-    queue!(stdout, MoveTo(0, 3), 
+    queue!(stderr, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
+    queue!(stderr, MoveTo(0, 2), Print(divider));
+    queue!(stderr, MoveTo(0, 3), 
            fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - MARGIN_COLS),
            Print(MARGIN),
            fit(&size_header, SIZE_MAX_COLS),
            fit(&date_header, DATE_MAX_COLS),
     );
-    queue!(stdout, MoveTo(0, 4), Print(divider));
+    queue!(stderr, MoveTo(0, 4), Print(divider));
 
     // -- MIDDLE -- //
     let filtered_entries = m.sorted_entries
@@ -688,9 +689,9 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     for (i, entry) in filtered_entries.iter().enumerate() {
         let rowNum = i + initialRowOffset;
         if rowNum == maxRowNum { break; }
-        if i == 0 { queue!(stdout, SetBackgroundColor(Color::DarkGrey)); }
+        if i == 0 { queue!(stderr, SetBackgroundColor(Color::DarkGrey)); }
         // itemhighlighted?
-        queue!(stdout,
+        queue!(stderr,
                MoveTo(0, (rowNum).try_into().unwrap()),
                Print(" "),
                fit(&entry.name, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - 2 * MARGIN_COLS),
@@ -699,12 +700,12 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
                Print(MARGIN),
                fit(&entry.date, DATE_MAX_COLS),
         );
-        if i == 0 { queue!(stdout, ResetColor); }
+        if i == 0 { queue!(stderr, ResetColor); }
     }
 
     // -- FOOTER -- //
-    queue!(stdout, MoveTo(0, (m.rows - 2).try_into().unwrap()), Print(divider));
-    queue!(stdout, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
+    queue!(stderr, MoveTo(0, (m.rows - 2).try_into().unwrap()), Print(divider));
+    queue!(stderr, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
            Print(&format!(" {} {}",
                         match m.mode {
                             Mode::Filter => "(filter)",
@@ -718,8 +719,8 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
                ),
     );
     match m.mode {
-        Mode::Filter => queue!(stdout, crossterm::cursor::Show,),
-        _ => queue!(stdout, crossterm::cursor::Hide,),
+        Mode::Filter => queue!(stderr, crossterm::cursor::Show,),
+        _ => queue!(stderr, crossterm::cursor::Hide,),
     };
 }
 

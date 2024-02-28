@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 use std::fs::DirEntry;
-use std::io::{stdout, Write};
+use std::io::{stderr, Write};
 
 use crossterm::{
     terminal,
@@ -32,17 +32,20 @@ impl<Init, View, Update> Program<Init, View, Update> {
     pub fn run<Model>(self) -> Model
     where 
         Init: FnOnce() -> Model, 
-        View: Fn(&Model, &mut std::io::Stdout),
+        View: Fn(&Model, &mut std::io::Stderr),
         Update: Fn(&mut Model, Event) -> Option<()>, 
     {
         let Self {init, view, update} = self;
-        let mut stdout = stdout();
+        // write all TUI content to stderr
+        // so stdout can display program output and be easily read 
+        // as opposed to trying to set global env var (which is shell-dependent)
+        let mut stderr = stderr();
 
         // disables some behavior like line wrapping and catching Enter presses
         // because i will handle those myself
         // https://docs.rs/crossterm/latest/crossterm/terminal/index.html#raw-mode
         terminal::enable_raw_mode(); 
-        queue!(stdout, 
+        queue!(stderr, 
                terminal::EnterAlternateScreen,
                terminal::DisableLineWrap,
                crossterm::cursor::Hide,
@@ -50,21 +53,21 @@ impl<Init, View, Update> Program<Init, View, Update> {
         );
 
         let mut model = init();
-        view(&model, &mut stdout);
-        stdout.flush();
+        view(&model, &mut stderr);
+        stderr.flush();
 
         loop {
             let event = await_next_event().unwrap();
             if update(&mut model, event).is_none() {
                 break;
             }
-            queue!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
-            view(&model, &mut stdout);
-            stdout.flush();
+            queue!(stderr, terminal::Clear(terminal::ClearType::All)).unwrap();
+            view(&model, &mut stderr);
+            stderr.flush();
         }
 
         // cleanup and be a good citizen so the terminal behaves normally afterwards (eg. start catching ctrl+c again, and show cursor)
-        execute!(stdout, 
+        execute!(stderr, 
                  terminal::EnableLineWrap,
                  terminal::LeaveAlternateScreen,
                  crossterm::cursor::Show,
