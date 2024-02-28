@@ -196,6 +196,7 @@ impl Display for FileSize {
     // 3) copy how ls -lh does it
     //
     // 4) use standard behavior from bytes crate, like
+    // let byte = Byte::from_bytes(self.0.into()).get_appropriate_unit(false);
     // "999.99 GB"  "1 B"
     // which is max 9 chars, min 3. not sure of the formatting alogorithm tho.
     //
@@ -380,7 +381,7 @@ impl std::convert::From<DirEntry> for Entry {
 // fn read_directory_quickly(dir, sort) -> Vec<PathBuf> // not reading metadata, but only enough to
 // display names for an in-progress view. TODO - measure time to read metadata.size/date
 
-fn read_entries(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
+fn read_directory_contents(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
     match dir.read_dir() {
         Ok(readdir) => {
             readdir
@@ -627,21 +628,28 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     // half-declarative view, without implementing a whole ui framework
     // hinges on having only one flex span horiz and vert - rest are static sizes
 
+    // mockup:
+    //
     //  C:\users\jkwon\desktop\programming\modenv
     //  ___________________________________________
     //   Name                v | Size   | Modified
     //  ___________________________________________
     //  loopy/                   12       2022-06
-    //  droopy/                  4        2022-06
-    //  grumpy/                  0        2022-06
+    // *droopy/                  4        2022-06
+    // *grumpy/                  0        2022-06
     //  frumpy/                  99       2022-06
-    //  script1.py               92 KB    2022-06
+    // *script1.py               92 KB    2022-06
     //  script_2.py              108 MB   2022-07
     //  main.py                  1.2 GB   2022-05
     //  utils.py                 985 B    2021-12
     // 
-    //  (mode) :?!@>/someinputtext                
+    //  (mode) :?!@>/someinputtext        item 2 of 20, and 3 selected
     //  ___________________________________________
+    //
+    //
+    //  consider the sentence as a UI element, as proposed in the essay magic ink (i just read it)
+    //  also consider inspiration from other file manager status lines like:
+    //  https://raw.githubusercontent.com/ranger/ranger-assets/master/screenshots/multipane.png
     
     // | <- fill -> |
     // | <- fill -> |
