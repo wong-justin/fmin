@@ -24,6 +24,8 @@ see `main.rs::update()` for keybindings
 
 **Goal 2**: file management commands like copy/paste, along with custom commands
 
+<!-- more comfortable than the shell could ever be, yet plays well with shell scripts -->
+
 ---
 
 0) bugfix: have sorted entries as source of truth; stop referencing randomly sorted hashset
@@ -44,7 +46,19 @@ see `main.rs::update()` for keybindings
 - clear jumptodir history eventually.. after 90days? after ranking score is at minimum? give script to clear all with minimum possible ranking score of 1 for user to manually execute (probs as one of the .sh functions to import intop command palette?)
 
 - consider using two env vars `$FMIN_CWD` and `$FMIN_SELECTED` that stay updated so user can shell out and use them when needed. maybe also `$FMIN_OPEN=myscript.sh` as a means to import that important and custom feature. note though that multiline env var values cause problmes with `env` command, so $FMIN_SELECTED cant be newline-separated. 
+	- note that this is a sort of anti-pattern, hacky way to use env vars; some may find it gross; but i think the resulting feature is a big usability/convenience win, for not much cost
+	- actually it might not work: the program can set current process env vars, and set global shell .env exports, but can't change parent process, and can't tell other processes that a global env var was updated, so other processes would have to source the .env file to use the recently updated paths (lame)
+	- maybe fmin.sh = 
+	```
+	FMIN_SET_CWD='setx FMIN_CWD={}'
+	FMIN_SET_SELECTED_FILEPAHTHS='setx FMIN_SELECTED={}'
+	```
+	or something like that, where you pass in a function template string to set your shell's global var
+	- this is all getting too complex; maybe have a nice program function for copying cwd to clipboard, and user can easily cd <paste> afterwards if they want. this still doesnt solve live scripting with selected files tho - maybe those filepaths can be copied to clipboard as well.
 
+	- investigate std::env::set_current_dir as an alternative to $FMIN_CWD
+	- also investigate create globalenv. EDIT - seems to hardcode a few expected paths for shell binaries and .env files; only mentions zsh/bash, not fish shell
+	- and also this related comment: "EDIT: The closest you may be able to get, is to take a page out of ssh-agent's book. Have your program emit "export" directives. Then to use it you can run eval $(myprog)"
 	- see also the terminal file manager that uses env vars for config: https://github.com/dylanaraps/fff?tab=readme-ov-file
 which apparently uses a little-known young standard $CDPATH that i might be interested in. EDIT - i dont like cdpath and it seems pretty rare and nonstandard. it's pretty much a manually set home path per session
 	- consider also: $FMIN_DELETE=rm by default, or 'mv $ /trash/'
@@ -204,7 +218,7 @@ that would get ugly quick tho. and poor design because cli options are designed 
 
 - how do non-american keyboards use vim hotkeys and other ascii char usecases, eg. WASD for games? will those keyboards still be able to input a-z,ctrl+[a-z],shift+[a-z] easily? do power users usually have a qwerty remap layer for these kinds of programs?
 
-- any cleanish, faster alternatives to the model-update-view application loop that avoids writing so many bytes to stdout each update frame? the current way feels a tad slow. or maybe windows terminal is just getting too slow for me personally
+- any cleanish, faster alternatives to the model-update-view application loop that avoids writing so many bytes to stdout each update frame? the current way feels a tad slow. or maybe windows terminal is just getting too slow for me personally, and it's not so much the application's fault
 
 - is it possible / worth incorporating tools for fuzzy matching and frecency tracking, like [fzf](https://github.com/junegunn/fzf) and [z](https://github.com/rupa/z)? in my opinion, it seems like a pain to integrate those shell tools, between code interface and user setup/installation, compared to reimplementing the basic functionality in rust (eg. string substring match instead of fuzzy match)
 
