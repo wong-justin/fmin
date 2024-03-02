@@ -626,8 +626,8 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
 
 // --- VIEWS AND MESSY STRING HANDLING --- //
 
-fn view(m: &Model, stderr: &mut std::io::Stderr) {
-    // view must be impure function writing to mutable buf stderr
+fn view(m: &Model, stdout: &mut std::io::Stdout) {
+    // view must be impure function writing to mutable buf stdout
     // since crossterm lib puts control bytes in custom types like SetBackgroundColor
     // that must be used here in queue!(buf, ...) function
     // and not postponed for agnostic model/update/view loop
@@ -677,30 +677,28 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     #[macro_export]
     macro_rules! divider_at_row {
         ( $row:expr ) => {
-            {
-                queue!(stderr, MoveTo(0,$row), Print(divider));
-            }
+            queue!(stdout, MoveTo(0,$row), Print(divider));
         };
     }
     
-    view_cwd(m, stderr);
+    view_cwd(m, stdout);
     divider_at_row!(2);
-    view_column_headers(m, stderr);
+    view_column_headers(m, stdout);
     divider_at_row!(4);
-    view_list_body(m, stderr);
+    view_list_body(m, stdout);
     divider_at_row!( (m.rows - 2).try_into().unwrap() );
-    view_footer(m, stderr);
+    view_footer(m, stdout);
 }
 
-fn view_cwd(m: &Model, stderr: &mut std::io::Stderr) {
-    queue!(stderr, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
+fn view_cwd(m: &Model, stdout: &mut std::io::Stdout) {
+    queue!(stdout, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
 }
 
-fn view_column_headers(m: &Model, stderr: &mut std::io::Stderr) {
+fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
     let name_header = format!(" Name {}", sort_indicator(EntryAttribute::Name, m.cwd_sort));
     let size_header = format!("Size {} ", sort_indicator(EntryAttribute::Size, m.cwd_sort));
     let date_header = format!("  Modified {}  ", sort_indicator(EntryAttribute::Date, m.cwd_sort));
-    queue!(stderr, MoveTo(0, 3), 
+    queue!(stdout, MoveTo(0, 3), 
            fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - MARGIN_COLS),
            Print(MARGIN),
            fit(&size_header, SIZE_MAX_COLS),
@@ -708,7 +706,7 @@ fn view_column_headers(m: &Model, stderr: &mut std::io::Stderr) {
     );
 }
 
-fn view_list_body(m: &Model, stderr: &mut std::io::Stderr) {
+fn view_list_body(m: &Model, stdout: &mut std::io::Stdout) {
     let filtered_entries = m.sorted_entries
         .clone()
         .into_iter()
@@ -721,9 +719,9 @@ fn view_list_body(m: &Model, stderr: &mut std::io::Stderr) {
     for (i, entry) in filtered_entries.iter().enumerate() {
         let rowNum = i + initialRowOffset;
         if rowNum == maxRowNum { break; }
-        if i == 0 { queue!(stderr, SetBackgroundColor(Color::DarkGrey)); }
+        if i == 0 { queue!(stdout, SetBackgroundColor(Color::DarkGrey)); }
         // itemhighlighted?
-        queue!(stderr,
+        queue!(stdout,
                MoveTo(0, (rowNum).try_into().unwrap()),
                Print(" "),
                fit(&entry.name, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - 2 * MARGIN_COLS),
@@ -732,12 +730,12 @@ fn view_list_body(m: &Model, stderr: &mut std::io::Stderr) {
                Print(MARGIN),
                fit(&entry.date, DATE_MAX_COLS),
         );
-        if i == 0 { queue!(stderr, ResetColor); }
+        if i == 0 { queue!(stdout, ResetColor); }
     }
 }
 
-fn view_footer(m: &Model, stderr: &mut std::io::Stderr) {
-    queue!(stderr, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
+fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
+    queue!(stdout, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
            Print(&format!(" {} {}",
                         match m.mode {
                             Mode::Filter => "(filter)",
@@ -751,8 +749,8 @@ fn view_footer(m: &Model, stderr: &mut std::io::Stderr) {
                ),
     );
     match m.mode {
-        Mode::Filter => queue!(stderr, crossterm::cursor::Show,),
-        _ => queue!(stderr, crossterm::cursor::Hide,),
+        Mode::Filter => queue!(stdout, crossterm::cursor::Show,),
+        _ => queue!(stdout, crossterm::cursor::Hide,),
     };
 }
 
@@ -782,7 +780,6 @@ fn fit_to_length(s: &str, final_length: usize) -> String {
         length => {
             s.chars().take(final_length).collect::<String>()
         }
-
     }
 }
 
