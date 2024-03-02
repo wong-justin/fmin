@@ -33,6 +33,15 @@ use crate::tui_program::Program;
 
 mod tui_program;
 
+// width of attribute columns, assuming ascii chars, based on desired formatted output and what
+// looks nice imo
+const SIZE_MAX_COLS : usize = 7;
+const DATE_MAX_COLS : usize = 14;
+const MARGIN_COLS : usize = 2;
+const MARGIN : &str = "  ";
+
+// --- MODEL AND TYPES --- //
+
 struct Model {
     mode: Mode,
     cwd: PathBuf,
@@ -400,7 +409,7 @@ fn read_directory_contents(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
     }
 }
 
-// APP LOGIC
+// --- UPDATES AND APP LOGIC --- //
 
 fn main() {
     // println!("");
@@ -426,6 +435,9 @@ fn init() -> Model {
         // needs" ?)
         Err(err) => (0,0)
     };
+
+    // env var setup
+    set_var("FMIN_CWD", &cwd.display().to_string());
 
     Model {
         cwd: cwd,
@@ -612,7 +624,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
     }
 }
 
-// UI AND MESSY STRING HANDLING BELOW
+// --- VIEWS AND MESSY STRING HANDLING --- //
 
 fn view(m: &Model, stderr: &mut std::io::Stderr) {
     // view must be impure function writing to mutable buf stderr
@@ -661,30 +673,42 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     // | <- fill -> |
     // | <- fill -> | 10 (cursor sometimes) |
     // | <- fill -> |
+    let divider : &str = &"-".repeat(m.cols);
+    #[macro_export]
+    macro_rules! divider_at_row {
+        ( $row:expr ) => {
+            {
+                queue!(stderr, MoveTo(0,$row), Print(divider));
+            }
+        };
+    }
     
-    // width of attribute columns, assuming ascii chars, based on desired formatted output and what
-    // looks nice imo
-    const SIZE_MAX_COLS : usize = 7;
-    const DATE_MAX_COLS : usize = 14;
-    const MARGIN_COLS : usize = 2;
-    const MARGIN : &str = "  ";
+    view_cwd(m, stderr);
+    divider_at_row!(2);
+    view_column_headers(m, stderr);
+    divider_at_row!(4);
+    view_list_body(m, stderr);
+    divider_at_row!( (m.rows - 2).try_into().unwrap() );
+    view_footer(m, stderr);
+}
 
-    // -- HEADERS -- //
+fn view_cwd(m: &Model, stderr: &mut std::io::Stderr) {
+    queue!(stderr, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
+}
+
+fn view_column_headers(m: &Model, stderr: &mut std::io::Stderr) {
     let name_header = format!(" Name {}", sort_indicator(EntryAttribute::Name, m.cwd_sort));
     let size_header = format!("Size {} ", sort_indicator(EntryAttribute::Size, m.cwd_sort));
     let date_header = format!("  Modified {}  ", sort_indicator(EntryAttribute::Date, m.cwd_sort));
-    let divider : &str = &"-".repeat(m.cols);
-    queue!(stderr, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
-    queue!(stderr, MoveTo(0, 2), Print(divider));
     queue!(stderr, MoveTo(0, 3), 
            fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - MARGIN_COLS),
            Print(MARGIN),
            fit(&size_header, SIZE_MAX_COLS),
            fit(&date_header, DATE_MAX_COLS),
     );
-    queue!(stderr, MoveTo(0, 4), Print(divider));
+}
 
-    // -- MIDDLE -- //
+fn view_list_body(m: &Model, stderr: &mut std::io::Stderr) {
     let filtered_entries = m.sorted_entries
         .clone()
         .into_iter()
@@ -710,9 +734,9 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
         );
         if i == 0 { queue!(stderr, ResetColor); }
     }
+}
 
-    // -- FOOTER -- //
-    queue!(stderr, MoveTo(0, (m.rows - 2).try_into().unwrap()), Print(divider));
+fn view_footer(m: &Model, stderr: &mut std::io::Stderr) {
     queue!(stderr, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
            Print(&format!(" {} {}",
                         match m.mode {
@@ -731,6 +755,8 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
         _ => queue!(stderr, crossterm::cursor::Hide,),
     };
 }
+
+// --- view helpers ---
 
 fn sort_indicator(match_attribute: EntryAttribute, current_sort: SortBy) -> &'static str {
     if match_attribute != current_sort.attribute { return " "; }
