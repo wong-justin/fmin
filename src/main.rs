@@ -412,20 +412,15 @@ fn read_directory_contents(dir: &PathBuf, sort: SortBy) -> HashSet<Entry> {
 // --- UPDATES AND APP LOGIC --- //
 
 fn main() {
-    // println!("");
     let final_model = Program {init, view, update}.run();
-    // set $FMIN_CWD = final_model.cwd.display()
-    // then tell user to alias fmin(*args) { fmin *args; cd $FMIN_CWD }
-    // or alias fmin = /thisrepo/script.sh
-    //
-    // cant pass cwd to stdout since thats where all the TUI bytes go as well
 
-    print!("{}", final_model.cwd.display());
+    // write last cwd path to tmp file so user can cd to it with their parent shell process
+    let temp_filepath = std::env::temp_dir().join("fmin.cwd");
+    std::fs::write(temp_filepath, final_model.cwd.display().to_string());
 }
 
 fn init() -> Model {
     let cwd = std::env::current_dir().unwrap();
-    // let cwd = PathBuf::from("/mnt/c/Users");
     let sort = SortBy{ attribute: EntryAttribute::Name, ascending: true };
     let all_entries = read_directory_contents(&cwd, sort);
     let sorted_entries = sort_entries(&all_entries, sort);
@@ -435,9 +430,6 @@ fn init() -> Model {
         // needs" ?)
         Err(err) => (0,0)
     };
-
-    // env var setup
-    set_var("FMIN_CWD", &cwd.display().to_string());
 
     Model {
         cwd: cwd,

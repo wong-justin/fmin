@@ -48,14 +48,15 @@ see `main.rs::update()` for keybindings
 - consider using two env vars `$FMIN_CWD` and `$FMIN_SELECTED` that stay updated so user can shell out and use them when needed. maybe also `$FMIN_OPEN=myscript.sh` as a means to import that important and custom feature. note though that multiline env var values cause problmes with `env` command, so $FMIN_SELECTED cant be newline-separated. 
 	- note that this is a sort of anti-pattern, hacky way to use env vars; some may find it gross; but i think the resulting feature is a big usability/convenience win, for not much cost
 	- actually it might not work: the program can set current process env vars, and set global shell .env exports, but can't change parent process, and can't tell other processes that a global env var was updated, so other processes would have to source the .env file to use the recently updated paths (lame)
+	- this is all getting too complex; maybe have a nice program function for copying cwd to clipboard, and user can easily cd <paste> afterwards if they want. this still doesnt solve live scripting with selected files tho - maybe those filepaths can be copied to clipboard as well.
+	- probably just use files; write data to /tmp/fmin_cwd or something like that
 	- maybe fmin.sh = 
 	```
-	FMIN_SET_CWD='setx FMIN_CWD={}'
-	FMIN_SET_SELECTED_FILEPAHTHS='setx FMIN_SELECTED={}'
-	```
-	or something like that, where you pass in a function template string to set your shell's global var
-	- this is all getting too complex; maybe have a nice program function for copying cwd to clipboard, and user can easily cd <paste> afterwards if they want. this still doesnt solve live scripting with selected files tho - maybe those filepaths can be copied to clipboard as well.
+	set FMIN_SHIFT_Z 'tar -xvf (cat /tmp/fmin.filepaths)'
 
+	fmin
+	cd (cat /tmp/fmin.cwd)
+	```
 	- investigate std::env::set_current_dir as an alternative to $FMIN_CWD
 	- also investigate create globalenv. EDIT - seems to hardcode a few expected paths for shell binaries and .env files; only mentions zsh/bash, not fish shell
 	- and also this related comment: "EDIT: The closest you may be able to get, is to take a page out of ssh-agent's book. Have your program emit "export" directives. Then to use it you can run eval $(myprog)"
