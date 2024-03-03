@@ -17,7 +17,7 @@ use crossterm::{
     terminal,
     queue,
     execute,
-    cursor::MoveTo,
+    cursor::{MoveTo, MoveToColumn, MoveToRow, MoveToNextLine},
     style::{Print, Color, SetBackgroundColor, SetForegroundColor, ResetColor},
     event::{
         read as await_next_event, 
@@ -75,6 +75,15 @@ enum Action {
     // StartCommandPaletteMode,
     Noop,
     Quit,
+}
+
+struct ListViewData {
+    items: Vec<String>, // row of Entry, row of Command, anything stringified
+    first_viewable_index: usize,
+    cursor_index: usize,
+    max_items_visible: usize,
+    // last_viewable_index = math.min (items.length - 1) , (max_items_visible - first_index)
+    // for later: attrs like marked_indexes:Set, 
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -655,50 +664,74 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     //  also consider inspiration from other file manager status lines like:
     //  https://raw.githubusercontent.com/ranger/ranger-assets/master/screenshots/multipane.png
     
-    // | <- fill -> |
-    // | <- fill -> |
-    // | <- fill -> | 6 | 8 |
-    // | <- fill -> |
-    //   | <- fill -> (highlight) | 6 (highlight) | 8 (highlight) |
-    // for v_stretch - 1
-    //   | <- fill -> | 6 | 8 |
-    // | <- fill -> |
-    // | <- fill -> | 10 (cursor sometimes) |
-    // | <- fill -> |
     let divider : &str = &"-".repeat(m.cols);
     #[macro_export]
-    macro_rules! divider_at_row {
-        ( $row:expr ) => {
-            queue!(stdout, MoveTo(0,$row), Print(divider));
+    macro_rules! divider {
+        () => {
+            queue!(stdout, Print(divider), MoveToNextLine(1));
         };
     }
     
-    view_cwd(m, stdout);
-    divider_at_row!(2);
-    view_column_headers(m, stdout);
-    divider_at_row!(4);
-    view_list_body(m, stdout);
-    divider_at_row!( (m.rows - 2).try_into().unwrap() );
-    view_footer(m, stdout);
+    view_cwd(m, stdout);            // height = 2
+    divider!();                     // height = 1
+    view_column_headers(m, stdout); // height = 1
+    divider!();                     // height = 1
+    view_list_body(m, stdout, m.rows - 7); 
+    divider!();                     // height = 1
+    view_footer(m, stdout);         // height = 1
 }
 
 fn view_cwd(m: &Model, stdout: &mut std::io::Stdout) {
-    queue!(stdout, MoveTo(1, 1), fit(&m.cwd.display().to_string(), m.cols));
+    queue!(stdout, 
+           MoveTo(1,1),
+           fit(&m.cwd.display().to_string(), m.cols),
+           MoveToNextLine(1)
+    );
 }
 
 fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
     let name_header = format!(" Name {}", sort_indicator(EntryAttribute::Name, m.cwd_sort));
     let size_header = format!("Size {} ", sort_indicator(EntryAttribute::Size, m.cwd_sort));
     let date_header = format!("  Modified {}  ", sort_indicator(EntryAttribute::Date, m.cwd_sort));
-    queue!(stdout, MoveTo(0, 3), 
+    queue!(stdout, 
            fit(&name_header, m.cols - SIZE_MAX_COLS - DATE_MAX_COLS - MARGIN_COLS),
            Print(MARGIN),
            fit(&size_header, SIZE_MAX_COLS),
            fit(&date_header, DATE_MAX_COLS),
+           MoveToNextLine(1)
     );
 }
 
-fn view_list_body(m: &Model, stdout: &mut std::io::Stdout) {
+fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
+    // need:
+    // - items to be listed, regardless of view
+    // - cursor position in viewable list slice, aka highlighted index
+    // - first index of viewable list slice 
+    // - last index of viewable list slice, aka first index + view height
+    // aka struct ListViewData for generic item list {
+    //   items: vec<String>,
+    //   first_viewable_index: usize,
+    //   cursor_index: usize,
+    //   max_rows_visible: usize, 
+    //     // last_viewable_index = math.min (items.length - 1) or (max_rows_visible - first_index)
+    //     // for later: attrs like marked_indexes:Set, 
+    // }
+    // impl traits:
+    // ListViewData.increment_cursor()
+    // ListViewData.decrement_cursor()
+    // for later: toggle_mark_under_cursor(), set_max_height(num_rows)
+    //
+    // then display slice of items, from first index to last index
+    //
+    // then listen for cursor move up:
+    //   if cursor == 0 then no op
+    //   elif cursor == first index then first index --, and last index --, and cursor --
+    //   else cursor --
+    // and listen for cursor move down:
+    //   if cursor == list length then no op
+    //   elif cursor == last index then first index++, last index ++, and cursor ++
+    //   else cursor ++
+
     let filtered_entries = m.sorted_entries
         .clone()
         .into_iter()
@@ -727,7 +760,7 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout) {
 }
 
 fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
-    queue!(stdout, MoveTo(0, (m.rows - 1).try_into().unwrap()), 
+    queue!(stdout, 
            Print(&format!(" {} {}",
                         match m.mode {
                             Mode::Filter => "(filter)",
