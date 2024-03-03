@@ -4,19 +4,109 @@ A terminal file manager inspired by [fman](https://fman.io/).
 
 ![screenshot](./demo/screenshot.png)
 
+## Features
+
+- `Enter` to nav forward, `Backspace` to nav back
+
+- type to filter directory contents, `Esc` to clear; capital letters reserved (see below)
+
+- `Shift+J/K` to nav up/down
+
+- `Shift+P`: open command palette of operations like copy/paste, as well as imported shell scripts
+
+- `Shift+O`: jump to frequently visited directories
+
+- sort by `Shift+N` file **n**ame, `Shift+S` file **s**ize, or `Shift+M` date **m**odified
+
+<!-- Shift + Space to mark as selected?? -->
+
+- `Shift+Q` or `Ctrl+C` to quit
+
+see `main.rs::update()` for all keybindings
+
+## Installation
+
+(while early development) `git clone https://github.com/wong-justin/fmin.git` then build.
+
+Note that `fmin` writes to three files:
+
+---
+
+- `$FMIN_HOME/fmin.history`, which tracks visited directories. Necessary to accumulate popular paths over time
+
+- `$FMIN_HOME/fmin.cwd`, which contains the most recently viewed directory. Useful to `cd` to where `fmin` exited
+
+- `$FMIN_HOME/fmin.highlighted_path`, which contains the path currently under `fmin`'s cursor. Useful for scripting custom commands
+
+IF `$FMIN_HOME` is not set at runtime, `fmin` will create a directory named `.fmin/` according to the xdg_home spec, namely at 1) ..., 2)... , or 3) ...
+
+Here's what a zero-config installation might look like after `fmin` runs:
+```
+└── $HOME/.fmin/
+    ├── fmin.cwd
+    ├── fmin.history
+    └── fmin.highlighted_path
+...
+└── /usr/bin/fmin
+```
+
+## Configuration
+
+`fmin` works out of the box with zero configuration.
+But I recommend using a startup script:
+
+```
+#!/bin/sh
+
+set FMIN_HOME $HOME/.fmin/
+
+# these one-liners will be imported as custom commands (as long as it's $FMIN_CMD_[anything])
+# their stdout will be written to fmin's status line (so hopefully it's terse)
+# comments will be searchable in fmin's command palette (so treat like titles)
+# [change these and make your own!]
+
+set FMIN_CMD_0 '#unzip \
+  tar -xvf (cat $FMIN_HOME/fmin.highlighted_path)'
+set FMIN_CMD_1 '#print image size \
+  ffmpeg --tell-me-image-dimensions (cat $FMIN_HOME/fmin.highlighted_path)'
+set FMIN_CMD_2 '#open in browser \
+  browser --open (cat $FMIN_HOME/fmin.highlighted_path)'
+set FMIN_CMD_3 '#open native file manager \
+  cmd.exe /C explorer (cat $FMIN_HOME/fmin.cwd)'
+set FMIN_CMD_4 '#copy cwd to clipboard \
+  cmd.exe /C clip (cat $FMIN_HOME/fmin.cwd)'
+set FMIN_CMD_5 '#safe remove \
+  mv (cat $FMIN_HOME/fmin.selected_paths) ~/trash/'
+
+# start the fmin binary
+# [change this path]
+
+/wherever/you/put/fmin
+
+# when finished, cd this shell session to fmin's last directory
+# [no need to change this]
+
+cd (cat $FMIN_HOME/fmin.cwd)
+```
+
+Here's what my `fmin` installation looks like:
+
+```
+└── $FMIN_HOME/
+    ├── fmin.cwd
+    ├── fmin.history
+    ├── fmin.highlighted_path
+    ├── fmin
+    └── fmin_startup.sh
+```
+
+... along with one shell alias: `alias fmin /path/to/fmin_startup.sh`
+
 ## Build
 
 `rustc --version 1.65.0` or newer
 
 `cargo build`
-
-## Installation
-
-(while early development) `git clone https://github.com/wong-justin/fmin.git` then build
-
-## Usage
-
-see `main.rs::update()` for keybindings
 
 ## Roadmap / To-do / Brain dump
 
@@ -25,8 +115,6 @@ see `main.rs::update()` for keybindings
 **Goal 2**: file management commands like copy/paste, along with custom commands
 
 <!-- more comfortable than the shell could ever be, yet plays well with shell scripts -->
-
----
 
 0) bugfix: have sorted entries as source of truth; stop referencing randomly sorted hashset
 
