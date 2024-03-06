@@ -57,6 +57,7 @@ struct Model {
     filter_text: String,
     cols: usize,
     rows: usize,
+    list_view: ListViewData,
 }
 enum Mode {
     Filter,
@@ -84,6 +85,17 @@ struct ListViewData {
     max_items_visible: usize,
     // last_viewable_index = math.min (items.length - 1) , (max_items_visible - first_index)
     // for later: attrs like marked_indexes:Set, 
+}
+
+impl ListViewData {
+    // fn increment_cursor(&self) -> ListViewData {
+    fn increment_cursor(&self) {
+    }
+    fn decrement_cursor(&self) {
+    }
+    fn set_max_height(&self, num_rows: usize) {
+    }
+    // for later: fn toggle_mark_under_cursor() {
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -115,6 +127,10 @@ struct StringifiedEntry {
     name: String,
     size: String,
     date: String,
+}
+
+trait PrintableRow {
+    fn display_as_row(&self) -> &'static str;
 }
 
 impl Clone for StringifiedEntry {
@@ -439,6 +455,12 @@ fn init() -> Model {
         // needs" ?)
         Err(err) => (0,0)
     };
+    let list_view = ListViewData {
+        items: vec![], // sorted_entries.map(to_string)
+        first_viewable_index: 0,
+        cursor_index: 0,
+        max_items_visible: rows - 7,
+    };
 
     Model {
         cwd: cwd,
@@ -449,6 +471,7 @@ fn init() -> Model {
         mode: Mode::Filter,
         cols: cols,
         rows: rows,
+        list_view: list_view,
     }
 }
 
