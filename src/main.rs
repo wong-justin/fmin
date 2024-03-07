@@ -807,7 +807,7 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     divider!();                     // height = 1
     view_column_headers(m, stderr); // height = 1
     divider!();                     // height = 1
-    view_list_body(m, stderr, m.rows - NUM_ROWS_OUTSIDE_LISTVIEW); 
+    view_list_body(m, stderr);      // height = m.rows - 8
     empty_line!();                  // height = 1
     divider!();                     // height = 1
     view_footer(m, stderr);         // height = 1
@@ -836,7 +836,7 @@ fn view_column_headers(m: &Model, stderr: &mut std::io::Stderr) {
     );
 }
 
-fn view_list_body(m: &Model, stderr: &mut std::io::Stderr, height: usize) {
+fn view_list_body(m: &Model, stderr: &mut std::io::Stderr) {
     // example of displaying list_view.items and indexes:
     //
     // all items indexes  
