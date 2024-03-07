@@ -116,8 +116,6 @@ Here's what my `fmin` installation looks like:
 
 <!-- more comfortable than the shell could ever be, yet plays well with shell scripts -->
 
-0) bugfix: have sorted entries as source of truth; stop referencing randomly sorted hashset
-
 1) move up and down in entry list, incl arrow keys in filter mode and `j/k` in normal mode. which means implementing flexible list view.
 
 2) implement jumptodir feature by tracking frecency in flat file db
