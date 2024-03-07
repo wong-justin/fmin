@@ -11,7 +11,6 @@ rust-version = "1.65.0"
 [dependencies]
 crossterm = "0.23.2"
 chrono = "0.4.19"
-byte-unit = "4.0.14"
 log = "0.4.20"
 binary-heap-plus = "0.5.0"
 

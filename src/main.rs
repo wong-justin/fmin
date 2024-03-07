@@ -12,7 +12,6 @@ use std::io::{Write};
 use std::path::{Path, PathBuf};
 
 use binary_heap_plus::BinaryHeap;
-use byte_unit::Byte;
 use chrono::{DateTime, Datelike, TimeZone, Local};
 use crossterm::{
     terminal,
@@ -207,7 +206,7 @@ impl Display for FileSize {
     // 3) copy how ls -lh does it
     //
     // 4) use standard behavior from bytes crate, like
-    // let byte = Byte::from_bytes(self.0.into()).get_appropriate_unit(false);
+    // let byte = byte_unit::Byte::from_bytes(self.0.into()).get_appropriate_unit(false);
     // "999.99 GB"  "1 B"
     // which is max 9 chars, min 3. not sure of the formatting alogorithm tho.
     //
