@@ -813,10 +813,12 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     view_footer(m, stderr);         // height = 1
 }
 
-fn view_cwd(m: &Model, stdout: &mut std::io::Stdout) {
-    queue!(stdout, 
-           MoveTo(1,1),
-           fit(&m.cwd.display().to_string(), m.cols),
+fn view_cwd(m: &Model, stderr: &mut std::io::Stderr) {
+    queue!(stderr,
+           MoveTo(0,0),
+           Print(" ".repeat(m.cols)), 
+           MoveToNextLine(1),
+           fit(&format!(" {}", m.cwd.display()), m.cols),
            MoveToNextLine(1)
     );
 }
