@@ -34,7 +34,7 @@ use crate::tui_program::Program;
 
 mod tui_program;
 
-// --- MODEL, and data structures --- //
+// --- MODEL, and other data structures --- //
 
 struct Model {
     mode: Mode,
@@ -53,6 +53,20 @@ struct Model {
     rows: usize,
     list_view: ListViewData,
 }
+
+struct Entry {
+    path: PathBuf,
+    is_dir: bool,
+    name: FileName,
+    // justification for maybe(date) and maybe(size):
+    // dirs dont have filesize - maybe count num of items in dir and display that instead? even recursively? but for now, dir has filesize None
+    // also for permission errors or special folders like $recyclebin - probably wont give you
+    // any metadata about size or date modified
+    // so entries might have filedate None
+    size: Option<FileSize>,
+    date: Option<FileDate>, 
+}
+
 enum Mode {
     Filter,
     Normal,
@@ -85,18 +99,6 @@ struct SortBy {
     ascending: bool,
 }
 
-struct Entry {
-    path: PathBuf,
-    is_dir: bool,
-    name: FileName,
-    // concerning maybe(date) and maybe(size):
-    // dirs dont have filesize - maybe count num of items in dir and display that instead? even recursively?
-    // also for permission errors or special folders like $recyclebin - probably wont give you
-    // any metadata about size or date modified
-    size: Option<FileSize>,
-    date: Option<FileDate>, 
-}
-
 #[derive(PartialEq, Eq, Clone)]
 struct FileName(String);
 
@@ -107,7 +109,8 @@ struct FileSize(u64);
 struct FileDate(DateTime<Local>);
 
 struct ListViewData {
-    items: Vec<String>, // row of Entry, row of Command, anything stringified
+    items: Vec<Entry>, // Vec<String> row of Entry, row of Command; could be anything stringified
+                        // maybe try Vec<ActionableDisplayableRow>; things you can press Enter on
     first_viewable_index: usize,
     cursor_index: usize,
     max_items_visible: usize,
@@ -137,69 +140,6 @@ impl Ord for FileName {
 impl PartialOrd for FileName {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-// #[derive(PartialEq, Eq)]
-// struct NameSortableEntry {
-//     entry: Entry,
-// }
-// 
-// impl Ord for NameSortableEntry {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         let a = self;
-//         let b = other;
-// 
-//         if a.is_dir && !b.is_dir {
-//             return Ordering::Less;
-//         }
-//         if !a.is_dir && b.is_dir {
-//             return Ordering::Greater;
-//         }
-//         return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
-//     }
-// }
-// 
-// impl PartialOrd for NameSortableEntry {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
-
-// width of attribute columns, assuming ascii chars, based on desired formatted output and what
-// looks nice imo
-const SIZE_COLUMN_WIDTH : usize = 7;
-const DATE_COLUMN_WIDTH : usize = 14;
-const MARGIN_WIDTH : usize = 2;
-const MARGIN : &str = "  ";
-
-impl ListViewData {
-    // fn increment_cursor(&self) -> ListViewData {
-    fn increment_cursor(&self) {
-    }
-    fn decrement_cursor(&self) {
-    }
-    fn set_max_height(&self, num_rows: usize) {
-    }
-    // for later: fn toggle_mark_under_cursor() {
-}
-
-trait PrintableRow {
-    // memoize these calls? surely will have repeats during filtering
-    fn print_as_row(&self, width_in_cols: usize) -> &'static str;
-}
-
-impl PrintableRow for Entry {
-    fn print_as_row(&self, width_in_cols: usize) -> &'static str {
-        // let name_width = width_in_cols - SIZE_COLUMN_WIDTH - DATE_COLUMN_WIDTH - 2 * MARGIN_WIDTH;
-        // format!(
-        //     " %s%s%s%s%s",
-        //     fit(name, name_width),
-        //     MARGIN,
-        //     fit_align_right(size, SIZE_COLUMN_WIDTH),
-        //     MARGIN,
-        //     fit(date, DATE_COLUMN_WIDTH),
-        // )
-        return "";
     }
 }
 
@@ -365,6 +305,55 @@ impl Display for FileDate {
     }
 }
 
+// width of attribute columns, assuming ascii chars
+// based on desired formatted output and what looks nice imo.
+// used in view functions later on
+const SIZE_COLUMN_WIDTH : usize = 7;
+const DATE_COLUMN_WIDTH : usize = 14;
+const MARGIN_WIDTH : usize = 2;
+const MARGIN : &str = "  ";
+const NUM_ROWS_OUTSIDE_LISTVIEW : usize = 7;
+
+impl ListViewData {
+    // fn increment_cursor(&self) -> ListViewData {
+    fn increment_cursor(&self) {
+    }
+    fn decrement_cursor(&self) {
+    }
+    // to listen for cursor move up:
+    //   if cursor == 0 then no op
+    //   elif cursor == first index then first index --, and last index --, and cursor --
+    //   else cursor --
+    // and listen for cursor move down:
+    //   if cursor == list length then no op
+    //   elif cursor == last index then first index++, last index ++, and cursor ++
+    //   else cursor ++
+
+    fn set_max_height(&self, num_rows: usize) {
+    }
+    // for later: fn toggle_mark_under_cursor() {
+}
+
+trait PrintableRow {
+    // memoize these calls? surely will have repeats during filtering
+    fn print_as_row(&self, width_in_cols: usize) -> &'static str;
+}
+
+impl PrintableRow for Entry {
+    fn print_as_row(&self, width_in_cols: usize) -> &'static str {
+        // let name_width = width_in_cols - SIZE_COLUMN_WIDTH - DATE_COLUMN_WIDTH - 2 * MARGIN_WIDTH;
+        // format!(
+        //     " %s%s%s%s%s",
+        //     fit(name, name_width),
+        //     MARGIN,
+        //     fit_align_right(size, SIZE_COLUMN_WIDTH),
+        //     MARGIN,
+        //     fit(date, DATE_COLUMN_WIDTH),
+        // )
+        return "";
+    }
+}
+
 impl SortBy {
     pub fn compare_entries(&self, a: &Entry, b: &Entry) -> Ordering {
         match &self.attribute {
@@ -450,6 +439,7 @@ fn read_directory_contents_into_sorted(dir: &PathBuf, sort: SortBy) -> Vec<Entry
     // read_directory_quickly(dir, sort) -> Vec<PathBuf> 
     // only gets name of entries for an in-progress view, and avoids reading metadata
     // TODO - measure time to read metadata.size/date
+    // also TODO - measure to confirm binary heap is actually faster than simple vec
 
     let mut name_sorted_heap = BinaryHeap::new_by(|a: &Entry, b: &Entry| sort.compare_entries(a, b) );
     
@@ -467,7 +457,18 @@ fn read_directory_contents_into_sorted(dir: &PathBuf, sort: SortBy) -> Vec<Entry
         Err(err) => (),
     };
 
+    // TODO - reverse this if !sort.ascending
     return name_sorted_heap.into_sorted_vec();
+}
+
+fn sort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
+    // let mut new_entries = entries.into_iter().collect::<Vec<&Entry>>();
+    let mut new_entries = entries.clone();
+    new_entries.sort_by(|a,b| sort.compare_entries(&a, &b));
+    if !sort.ascending {
+        new_entries.reverse();
+    }
+    return new_entries;
 }
 
 // --- UPDATES AND APP LOGIC --- //
@@ -491,10 +492,10 @@ fn init() -> Model {
         Err(err) => (0,0)
     };
     let list_view = ListViewData {
-        items: vec![], // sorted_entries.map(to_string)
+        items: sorted_entries.clone(), // sorted_entries.map(to_string)
         first_viewable_index: 0,
         cursor_index: 0,
-        max_items_visible: rows - 7,
+        max_items_visible: rows - NUM_ROWS_OUTSIDE_LISTVIEW,
     };
 
     Model {
@@ -507,16 +508,6 @@ fn init() -> Model {
         rows: rows,
         list_view: list_view,
     }
-}
-
-fn resort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
-    // let mut new_entries = entries.into_iter().collect::<Vec<&Entry>>();
-    let mut new_entries = entries.clone();
-    new_entries.sort_by(|a,b| sort.compare_entries(&a, &b));
-    if !sort.ascending {
-        new_entries.reverse();
-    }
-    return new_entries;
 }
 
 fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
@@ -658,13 +649,13 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             m.cwd_sort.attribute = attribute;
             m.cwd_sort.ascending = true;
             // m.cwd_sort = SortBy { attribute: attribute, ascending: true };
-            m.sorted_entries = resort_entries(&m.sorted_entries, m.cwd_sort);
+            m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             Some(())
         },
         Action::ReverseSort => {
             m.cwd_sort.ascending = !m.cwd_sort.ascending;
             // m.cwd_sort = SortBy { attribute: m.cwd_sort.attribute, ascending: !m.cwd_sort.ascending };
-            m.sorted_entries = resort_entries(&m.sorted_entries, m.cwd_sort);
+            m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             Some(())
         },
         Action::StartFilterMode => {
@@ -679,18 +670,18 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
 // --- VIEWS AND MESSY STRING HANDLING --- //
 
 fn view(m: &Model, stdout: &mut std::io::Stdout) {
+    // half-declarative view, without implementing a whole ui framework
+    // hinges on having only one flex span horiz and vert - rest are static sizes
+    //
     // view must be impure function writing to mutable buf stdout
     // since crossterm lib puts control bytes in custom types like SetBackgroundColor
-    // that must be used here in queue!(buf, ...) function
+    // so view happens with mutable in queue!(buf, ...) function
     // and not postponed for agnostic model/update/view loop
     //
     // maybe i can send a list of crossterm::Commands to queue...
     // but probably not worth making a whole structure of dozens of commands, 
     // only to delay writing to the same place one function later,
     // just for the sake of 'purity'
-
-    // half-declarative view, without implementing a whole ui framework
-    // hinges on having only one flex span horiz and vert - rest are static sizes
 
     // mockup:
     //
@@ -727,7 +718,7 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     divider!();                     // height = 1
     view_column_headers(m, stdout); // height = 1
     divider!();                     // height = 1
-    view_list_body(m, stdout, m.rows - 7); 
+    view_list_body(m, stdout, m.rows - NUM_ROWS_OUTSIDE_LISTVIEW); 
     divider!();                     // height = 1
     view_footer(m, stdout);         // height = 1
 }
@@ -754,36 +745,35 @@ fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
 }
 
 fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
-    // need listviewdata struct:
-    //
-    // display slice of items, from first index to last index
-    //
-    // then listen for cursor move up:
-    //   if cursor == 0 then no op
-    //   elif cursor == first index then first index --, and last index --, and cursor --
-    //   else cursor --
-    // and listen for cursor move down:
-    //   if cursor == list length then no op
-    //   elif cursor == last index then first index++, last index ++, and cursor ++
-    //   else cursor ++
+    // display slice of items, from first viewable to last, and including cursor
 
-
-
+    // let filtered_entres = m.list_view.items;
     let filtered_entries = m.sorted_entries
         .clone()
         .into_iter()
         .filter(|entry| entry.name.0.to_lowercase().contains(&m.filter_text.to_lowercase()) )
         .collect::<Vec<Entry>>();
 
-    let initialRowOffset = 5;
-    let endingRowOffset = 3;
-    let maxRowNum = m.rows - endingRowOffset;
-    for (i, entry) in filtered_entries.iter().enumerate() {
-        let rowNum = i + initialRowOffset;
-        if rowNum == maxRowNum { break; }
-        if i == 0 { queue!(stdout, SetBackgroundColor(Color::DarkGrey)); }
-        // itemhighlighted?
+    // example of displaying list_view.items and indexes:
+    //
+    // 0 - out of view
+    // ---
+    // 1 - iterator index 0
+    // 2 - iterator index 1
+    // 3 - iterator index 2 - cursor index 3
+    // 4 - iterator index 3
+    // ---
+    // 5 - out of view
+    //
+    // first_viewable_index = 1
+    // max_items_visible = 4
 
+    // iterate over viewable items
+    let viewable_entries = filtered_entries.iter()
+        .skip(m.list_view.first_viewable_index)
+        .take(m.list_view.max_items_visible - 1); // decided to leave 1 empty row as bottom margin
+
+    for (visible_index, entry) in viewable_entries.enumerate() {
         let name = &entry.name.0.clone();
         let size = match &entry.size {
             Some(size_bytes) => size_bytes.to_string(),
@@ -794,19 +784,33 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
             None => String::new(),
         };
 
+        let at_cursor = m.list_view.cursor_index == visible_index + m.list_view.first_viewable_index;
+        if at_cursor { queue!(stdout, SetBackgroundColor(Color::DarkGrey)); }
+
         queue!(stdout,
-               MoveTo(0, (rowNum).try_into().unwrap()),
                Print(" "),
                fit(&name, m.cols - SIZE_COLUMN_WIDTH - DATE_COLUMN_WIDTH - 2 * MARGIN_WIDTH),
                Print(MARGIN),
                fit( &pad_align_right(&size, SIZE_COLUMN_WIDTH), SIZE_COLUMN_WIDTH),
                Print(MARGIN),
                fit(&date, DATE_COLUMN_WIDTH),
+               MoveToNextLine(1),
         );
-        if i == 0 { queue!(stdout, ResetColor); }
+
+        if at_cursor { queue!(stdout, ResetColor); }
     }
 
-    queue!(stdout, MoveToNextLine(1));
+    // skip possible empty space and move to footer
+    if m.list_view.max_items_visible > filtered_entries.len() {
+        let empty_rows : u16 = (
+            m.list_view.max_items_visible - filtered_entries.len()
+        ).try_into().unwrap();
+
+        queue!(stdout, MoveToNextLine(empty_rows));
+    }
+    else {
+        queue!(stdout, MoveToNextLine(1));
+    }
 }
 
 fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
@@ -829,7 +833,7 @@ fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
     };
 }
 
-// --- view helpers ---
+// --- view helpers --- //
 
 fn sort_indicator(match_attribute: EntryAttribute, current_sort: SortBy) -> &'static str {
     if match_attribute != current_sort.attribute { return " "; }
@@ -845,7 +849,7 @@ fn fit(s: &str, final_length: usize) -> Print<String> {
 }
 
 fn fit_to_length(s: &str, final_length: usize) -> String {
-    // assuming only ASCII input...
+    // bad: assuming only ASCII input...
     match str_length(s) {
         // too short
         length if length <= final_length => {
@@ -859,7 +863,7 @@ fn fit_to_length(s: &str, final_length: usize) -> String {
 }
 
 fn str_length<S: AsRef<str>> (s: S) -> usize {
-    // assuming only ASCII input...
+    // bad: assuming only ASCII input...
     return s.as_ref().chars().count();
 }
 
