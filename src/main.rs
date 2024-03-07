@@ -555,6 +555,9 @@ fn init() -> Model {
 
 fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
     // exit early if ctrl+c, no matter what
+    // returning None means to quit the program
+    // TODO - have a better return type than None/Some(())
+
     match terminal_event {
         Event::Key(keyevent) => {
             if
@@ -611,12 +614,8 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                                 _ => Action::ChangeSortOrder(EntryAttribute::Date),
                             }
                         },
-                        KeyCode::Char('k') | KeyCode::Up => {
-                            Action::TryCursorMoveUp
-                        },
-                        KeyCode::Char('j') | KeyCode::Down => {
-                            Action::TryCursorMoveDown
-                        },
+                        KeyCode::Char('k') | KeyCode::Up => Action::TryCursorMoveUp,
+                        KeyCode::Char('j') | KeyCode::Down => Action::TryCursorMoveDown,
                         KeyCode::Enter => Action::SelectEntryUnderCursor,
                         KeyCode::Char('q') => Action::Quit,
                         _ => Action::Noop,
@@ -628,45 +627,66 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
         Mode::Filter => {
             match terminal_event {
                 Event::Key(keyevent) => {
-                    // todo: listen for end-of-input ctrl+d, arrow keys left and right, paste
-                    // ideally a readline lib is used to listen for input here, but
-                    // - dont need history or multiline editing, and probably not vim/emacs shortcuts
-                    // - not sure how to include static .so external dependency
-                    // so probably not worth including that extra dependency
-                    match keyevent.code {
-                        KeyCode::Esc => Action::SetFilterText("".to_string()),
-                        KeyCode::Char(c) => {
-                            Action::SetFilterText(format!("{}{}", m.filter_text, c))
+                    match keyevent.modifiers {
+                        KeyModifiers::SHIFT => match keyevent.code {
+                            KeyCode::Char('K') => Action::TryCursorMoveUp,
+                            KeyCode::Char('J') => Action::TryCursorMoveDown,
+                            KeyCode::Char('N') => match m.cwd_sort.attribute {
+                                EntryAttribute::Name => Action::ReverseSort,
+                                _ => Action::ChangeSortOrder(EntryAttribute::Name),
+                            },
+                            KeyCode::Char('S') => match m.cwd_sort.attribute {
+                                EntryAttribute::Size => Action::ReverseSort,
+                                _ => Action::ChangeSortOrder(EntryAttribute::Size),
+                            },
+                            KeyCode::Char('M') => match m.cwd_sort.attribute {
+                                EntryAttribute::Date => Action::ReverseSort,
+                                _ => Action::ChangeSortOrder(EntryAttribute::Date),
+                            },
+                            // KeyCode::Char('O') => Action::StartJumpMode,
+                            // KeyCode::Char('P') => Action::StartCommandPaletteMode,
+                            _ => Action::Noop,
                         },
-                        KeyCode::Backspace => {
-                            match m.filter_text.is_empty() {
-                                // if filter text input is empty, backspace will nav back as if in
-                                // normal mode.
-                                // this reduces keypresses when navigating since normal mode is not
-                                // default.
-                                true => match m.cwd.parent() {
-                                    Some(path) => Action::GotoDir(path.to_owned()),
-                                    None => Action::SetFilterText("".to_string()), // clear and go normal mode
-                                },
-                                // remove last char. warning: doesnt account for unicode.
-                                // but this quick and dirty solution is ok for now.
-                                // and most filepath inputs will only have ascii anyways.
-                                false => {
-                                    let mut chars = m.filter_text.chars();
-                                    chars.next_back();
-                                    let all_chars_but_last = chars.as_str().to_string();
-                                    Action::SetFilterText(all_chars_but_last) // potentially clear and go normal mode
-                                },
-                            }
-                        },
-                        KeyCode::Up => {
-                            Action::TryCursorMoveUp
-                        },
-                        KeyCode::Down => {
-                            Action::TryCursorMoveDown
-                        },
-                        KeyCode::Enter => Action::SelectEntryUnderCursor,
-                        _ => Action::Noop,
+                        _ => match keyevent.code {
+                            // todo: listen for end-of-input ctrl+d, arrow keys left and right, paste
+                            // ideally a readline lib is used to listen for input here, but
+                            // - dont need history or multiline editing, and probably not vim/emacs shortcuts
+                            // - not sure how to include static .so external dependency
+                            // so probably not worth including that extra dependency
+                            KeyCode::Esc => Action::SetFilterText("".to_string()),
+                            KeyCode::Char(c) => {
+                                Action::SetFilterText(format!("{}{}", m.filter_text, c))
+                            },
+                            KeyCode::Backspace => {
+                                match m.filter_text.is_empty() {
+                                    // if filter text input is empty, backspace will nav back as if in
+                                    // normal mode.
+                                    // this reduces keypresses when navigating since normal mode is not
+                                    // default.
+                                    true => match m.cwd.parent() {
+                                        Some(path) => Action::GotoDir(path.to_owned()),
+                                        None => Action::SetFilterText("".to_string()), // clear and go normal mode
+                                    },
+                                    // remove last char. warning: doesnt account for unicode.
+                                    // but this quick and dirty solution is ok for now.
+                                    // and most filepath inputs will only have ascii anyways.
+                                    false => {
+                                        let mut chars = m.filter_text.chars();
+                                        chars.next_back();
+                                        let all_chars_but_last = chars.as_str().to_string();
+                                        Action::SetFilterText(all_chars_but_last) // potentially clear and go normal mode
+                                    },
+                                }
+                            },
+                            KeyCode::Up => {
+                                Action::TryCursorMoveUp
+                            },
+                            KeyCode::Down => {
+                                Action::TryCursorMoveDown
+                            },
+                            KeyCode::Enter => Action::SelectEntryUnderCursor,
+                            _ => Action::Noop,
+                        }
                     }
                 },
                 _ => Action::Noop,
@@ -684,10 +704,10 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             Some(())
         },
         Action::SetFilterText(text) => {
-            m.mode = match text.is_empty() {
-                true => Mode::Normal,
-                false => Mode::Filter,
-            };
+            // m.mode = match text.is_empty() {
+            //     true => Mode::Normal,
+            //     false => Mode::Filter,
+            // };
             m.filter_text = text;
 
             let filtered_entries =  m.sorted_entries
