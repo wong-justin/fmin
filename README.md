@@ -8,8 +8,10 @@ A terminal file manager inspired by [fman](https://fman.io/).
 
 - `Enter` to nav forward, `Backspace` to nav back
 
-- type to filter directory contents, `Esc` to clear; capital letters reserved (see below)
+<!-- - type to filter directory contents, `Esc` to clear; capital letters reserved (see below) -->
+- type to filter directory contents, `Esc` to clear
 
+<!--
 - `Shift+J/K` to nav up/down
 
 - `Shift+P`: open command palette of operations like copy/paste, as well as imported shell scripts
@@ -17,10 +19,12 @@ A terminal file manager inspired by [fman](https://fman.io/).
 - `Shift+O`: jump to frequently visited directories
 
 - sort by `Shift+N` file **n**ame, `Shift+S` file **s**ize, or `Shift+M` date **m**odified
+-->
 
 <!-- Shift + Space to mark as selected?? -->
 
-- `Shift+Q` or `Ctrl+C` to quit
+<!-- - `Shift+Q` or `Ctrl+C` to quit -->
+- `Ctrl+C` to quit
 
 see `main.rs::update()` for all keybindings
 
@@ -28,9 +32,10 @@ see `main.rs::update()` for all keybindings
 
 (while early development) `git clone https://github.com/wong-justin/fmin.git` then build.
 
+<!--
 Note that `fmin` writes to three files:
 
----
+___
 
 - `$FMIN_HOME/fmin.history`, which tracks visited directories. Necessary to accumulate popular paths over time
 
@@ -49,10 +54,12 @@ Here's what a zero-config installation might look like after `fmin` runs:
 ...
 └── /usr/bin/fmin
 ```
+-->
 
 ## Configuration
 
 `fmin` works out of the box with zero configuration.
+<!--
 But I recommend using a startup script:
 
 ```
@@ -101,6 +108,7 @@ Here's what my `fmin` installation looks like:
 ```
 
 ... along with one shell alias: `alias fmin /path/to/fmin_startup.sh`
+-->
 
 ## Build
 
