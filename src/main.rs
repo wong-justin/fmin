@@ -521,10 +521,7 @@ fn sort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
 
 fn main() {
     let final_model = Program {init, view, update}.run();
-
-    // write last cwd path to tmp file so user can cd to it with their parent shell process
-    let temp_filepath = std::env::temp_dir().join("fmin.cwd");
-    std::fs::write(temp_filepath, final_model.cwd.display().to_string());
+    print!("{}", final_model.cwd.display());
 }
 
 fn init() -> Model {
@@ -754,11 +751,11 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
 
 // --- VIEWS AND MESSY STRING HANDLING --- //
 
-fn view(m: &Model, stdout: &mut std::io::Stdout) {
+fn view(m: &Model, stderr: &mut std::io::Stderr) {
     // half-declarative view, without implementing a whole ui framework
     // hinges on having only one flex span horiz and vert - rest are static sizes
     //
-    // view must be impure function writing to mutable buf stdout
+    // view must be impure function writing to mutable buf stderr
     // since crossterm lib puts control bytes in custom types like SetBackgroundColor
     // so view happens with mutable in queue!(buf, ...) function
     // and not postponed for agnostic model/update/view loop
@@ -795,25 +792,25 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
     #[macro_export]
     macro_rules! divider {
         () => {
-            queue!(stdout, Print(divider), MoveToNextLine(1));
+            queue!(stderr, Print(divider), MoveToNextLine(1));
         };
     }
     #[macro_export]
     macro_rules! empty_line {
         () => {
-            queue!(stdout, MoveToNextLine(1));
+            queue!(stderr, MoveToNextLine(1));
         };
     }
-    queue!(stdout, crossterm::cursor::Hide);
+    queue!(stderr, crossterm::cursor::Hide);
 
-    view_cwd(m, stdout);            // height = 2
+    view_cwd(m, stderr);            // height = 2
     divider!();                     // height = 1
-    view_column_headers(m, stdout); // height = 1
+    view_column_headers(m, stderr); // height = 1
     divider!();                     // height = 1
-    view_list_body(m, stdout, m.rows - NUM_ROWS_OUTSIDE_LISTVIEW); 
+    view_list_body(m, stderr, m.rows - NUM_ROWS_OUTSIDE_LISTVIEW); 
     empty_line!();                  // height = 1
     divider!();                     // height = 1
-    view_footer(m, stdout);         // height = 1
+    view_footer(m, stderr);         // height = 1
 }
 
 fn view_cwd(m: &Model, stdout: &mut std::io::Stdout) {
@@ -824,11 +821,11 @@ fn view_cwd(m: &Model, stdout: &mut std::io::Stdout) {
     );
 }
 
-fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
+fn view_column_headers(m: &Model, stderr: &mut std::io::Stderr) {
     let name_header = format!(" Name {}", sort_indicator(EntryAttribute::Name, m.cwd_sort));
     let size_header = format!("Size {} ", sort_indicator(EntryAttribute::Size, m.cwd_sort));
     let date_header = format!("  Modified {}  ", sort_indicator(EntryAttribute::Date, m.cwd_sort));
-    queue!(stdout, 
+    queue!(stderr, 
            fit(&name_header, m.cols - SIZE_COLUMN_WIDTH - DATE_COLUMN_WIDTH - MARGIN_WIDTH),
            Print(MARGIN),
            fit(&size_header, SIZE_COLUMN_WIDTH),
@@ -837,7 +834,7 @@ fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
     );
 }
 
-fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
+fn view_list_body(m: &Model, stderr: &mut std::io::Stderr, height: usize) {
     // example of displaying list_view.items and indexes:
     //
     // all items indexes  
@@ -845,7 +842,7 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
     //                    
     // out of   0 
     // view     -----    viewable indexes
-    //          1   0  on right           
+    //          1   0    on right           
     //          2   1           
     //          3   2  
     //          4   3
@@ -872,9 +869,9 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
         };
 
         let at_cursor = m.list_view.cursor_index == visible_index + m.list_view.first_viewable_index;
-        if at_cursor { queue!(stdout, SetBackgroundColor(Color::DarkGrey)); }
+        if at_cursor { queue!(stderr, SetBackgroundColor(Color::DarkGrey)); }
 
-        queue!(stdout,
+        queue!(stderr,
                Print(" "),
                fit(&name, m.cols - SIZE_COLUMN_WIDTH - DATE_COLUMN_WIDTH - 2 * MARGIN_WIDTH),
                Print(MARGIN),
@@ -884,23 +881,21 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
                MoveToNextLine(1),
         );
 
-        if at_cursor { queue!(stdout, ResetColor); }
+        if at_cursor { queue!(stderr, ResetColor); }
     }
 
     // draw over any empty rows
     if m.list_view.max_items_visible > m.list_view.items.len() {
-        let empty_rows = (
-            m.list_view.max_items_visible - m.list_view.items.len()
-        );
+        let empty_rows = m.list_view.max_items_visible - m.list_view.items.len();
 
         for _ in 0..empty_rows {
-            queue!(stdout, Print(" ".repeat(m.cols)), MoveToNextLine(1));
+            queue!(stderr, Print(" ".repeat(m.cols)), MoveToNextLine(1));
         }
     }
 }
 
-fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
-    queue!(stdout, 
+fn view_footer(m: &Model, stderr: &mut std::io::Stderr) {
+    queue!(stderr, 
            // clear any artifacts from previous draw
            Print(" ".repeat(m.cols)),
            MoveToColumn(1),
@@ -918,8 +913,8 @@ fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
                ),
     );
     match m.mode {
-        Mode::Filter => queue!(stdout, crossterm::cursor::Show,),
-        _ => queue!(stdout, crossterm::cursor::Hide,),
+        Mode::Filter => queue!(stderr, crossterm::cursor::Show,),
+        _ => queue!(stderr, crossterm::cursor::Hide,),
     };
 }
 

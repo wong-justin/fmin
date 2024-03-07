@@ -32,17 +32,13 @@ impl<Init, View, Update> Program<Init, View, Update> {
     pub fn run<Model>(self) -> Model
     where 
         Init: FnOnce() -> Model, 
-        View: Fn(&Model, &mut std::io::Stdout),
+        View: Fn(&Model, &mut std::io::Stderr),
         Update: Fn(&mut Model, Event) -> Option<()>, 
     {
         let Self {init, view, update} = self;
-        // if write all TUI content to stdout:
-        // - nice redraws
-        // - cannot print anything to stdout on app finish
-        // if write all TUI content to stderr:
-        // - cwd can be printed to stdout on app finish for easy scripting: `cd (fmin)`
-        // - but redraws flash between frames (on windows terminal at least)
-        let mut stdout = stdout();
+        // write all TUI content to stderr, so on finish, stdout can pass information,
+        // like `cd (fmin)`
+        let mut stdout = std::io::stderr();
 
         // disables some behavior like line wrapping and catching Enter presses
         // because i will handle those myself
