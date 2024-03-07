@@ -570,6 +570,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
         Event::Resize(cols, rows) => {
             m.cols = usize::from(cols);
             m.rows = usize::from(rows);
+            m.list_view.max_items_visible = m.rows - NUM_ROWS_OUTSIDE_LISTVIEW;
         }
         _ => ()
     };
