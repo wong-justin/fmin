@@ -17,7 +17,7 @@ use crossterm::{
     terminal,
     queue,
     execute,
-    cursor::{MoveTo, MoveToColumn, MoveToRow, MoveToNextLine},
+    cursor::{MoveTo, MoveToColumn, MoveToRow, MoveToNextLine, MoveToPreviousLine},
     style::{Print, Color, SetBackgroundColor, SetForegroundColor, ResetColor},
     event::{
         read as await_next_event, 
@@ -803,7 +803,8 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
             queue!(stdout, MoveToNextLine(1));
         };
     }
-    
+    queue!(stdout, crossterm::cursor::Hide);
+
     view_cwd(m, stdout);            // height = 2
     divider!();                     // height = 1
     view_column_headers(m, stdout); // height = 1
@@ -838,14 +839,18 @@ fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
 fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
     // example of displaying list_view.items and indexes:
     //
-    // 0 - out of view
-    // ---
-    // 1 - iterator index 0
-    // 2 - iterator index 1
-    // 3 - iterator index 2 - cursor index 3
-    // 4 - iterator index 3
-    // ---
-    // 5 - out of view
+    // all items indexes  
+    // on left
+    //                    
+    // out of   0 
+    // view     -----    viewable indexes
+    //          1   0  on right           
+    //          2   1           
+    //          3   2  
+    //          4   3
+    //          -----
+    // out of   5
+    // view
     //
     // first_viewable_index = 1
     // max_items_visible = 4
@@ -881,18 +886,24 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
         if at_cursor { queue!(stdout, ResetColor); }
     }
 
-    // skip possible empty space and move to footer
+    // draw over any empty rows
     if m.list_view.max_items_visible > m.list_view.items.len() {
-        let empty_rows : u16 = (
+        let empty_rows = (
             m.list_view.max_items_visible - m.list_view.items.len()
-        ).try_into().unwrap();
+        );
 
-        queue!(stdout, MoveToNextLine(empty_rows));
+        for _ in 0..empty_rows {
+            queue!(stdout, Print(" ".repeat(m.cols)), MoveToNextLine(1));
+        }
     }
 }
 
 fn view_footer(m: &Model, stdout: &mut std::io::Stdout) {
     queue!(stdout, 
+           // clear any artifacts from previous draw
+           Print(" ".repeat(m.cols)),
+           MoveToColumn(1),
+           // display filter field
            Print(&format!(" {} {}",
                         match m.mode {
                             Mode::Filter => "(filter)",

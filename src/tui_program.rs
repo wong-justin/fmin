@@ -64,7 +64,6 @@ impl<Init, View, Update> Program<Init, View, Update> {
             if update(&mut model, event).is_none() {
                 break;
             }
-            queue!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
             view(&model, &mut stdout);
             stdout.flush();
         }
