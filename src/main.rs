@@ -77,11 +77,13 @@ enum Mode {
 enum Action {
     GotoDir(PathBuf),
     SetFilterText(String),
-    SelectFirstEntry,
+    SelectEntryUnderCursor,
     StartFilterMode,
     ChangeSortOrder(EntryAttribute),
     ReverseSort,
     // StartCommandPaletteMode,
+    TryCursorMoveUp,
+    TryCursorMoveDown,
     Noop,
     Quit,
 }
@@ -110,7 +112,7 @@ struct FileDate(DateTime<Local>);
 
 struct ListViewData {
     items: Vec<Entry>, // Vec<String> row of Entry, row of Command; could be anything stringified
-                        // maybe try Vec<ActionableDisplayableRow>; things you can press Enter on
+                       // maybe try Vec<ListItem> where ListItem impls display() and on_enter()
     first_viewable_index: usize,
     cursor_index: usize,
     max_items_visible: usize,
@@ -312,13 +314,58 @@ const SIZE_COLUMN_WIDTH : usize = 7;
 const DATE_COLUMN_WIDTH : usize = 14;
 const MARGIN_WIDTH : usize = 2;
 const MARGIN : &str = "  ";
-const NUM_ROWS_OUTSIDE_LISTVIEW : usize = 7;
+const NUM_ROWS_OUTSIDE_LISTVIEW : usize = 8;
 
 impl ListViewData {
-    // fn increment_cursor(&self) -> ListViewData {
-    fn increment_cursor(&self) {
+    // fn new(items: Vec<Entry>) {
+    //     return Self {
+    //         items: items,
+    //         first_viewable_index: 0,
+    //         cursor_index: 0,
+    //         max_items_visible
+    //     }
+    // }
+    fn reset_with_items(&mut self, items: Vec<Entry>) {
+        self.items = items;
+        self.cursor_index = 0;
+        self.first_viewable_index = 0;
     }
-    fn decrement_cursor(&self) {
+    // fn increment_cursor(&self) -> ListViewData {
+    // return Self {
+    //  ..self,
+    //  cursor_index: new_value
+    // }
+    fn increment_cursor(&mut self) {
+        let last_viewable_index = self.max_items_visible + self.first_viewable_index - 1;
+
+        // at last index, no movement possible
+        if self.cursor_index == self.items.len() - 1 {
+            // noop
+        }
+        // at bottom of list, and you can scroll down
+        else if self.cursor_index == last_viewable_index {
+            self.cursor_index += 1;
+            self.first_viewable_index += 1;
+        }
+        // in middle of list, no need to scroll yet
+        else {
+            self.cursor_index += 1;
+        }
+    }
+    fn decrement_cursor(&mut self) {
+        // at first index, no movement possible
+        if self.cursor_index == 0 {
+            // noop
+        }
+        // at top of list, when scrolling is possible
+        else if self.cursor_index == self.first_viewable_index {
+            self.cursor_index -= 1;
+            self.first_viewable_index -= 1;
+        }
+        // middle of list, no need to scroll yet
+        else {
+            self.cursor_index -= 1;
+        }
     }
     // to listen for cursor move up:
     //   if cursor == 0 then no op
@@ -543,6 +590,13 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                             }
                         },
                         KeyCode::Char('n') => {
+                            // Action::ChangeSortOrder(SortBy{ 
+                            //     attribute: EntryAttribute::Name,
+                            //     ascending: match m.cwd_sort.attribute == EntryAttribute::Name {
+                            //         EntryAttribute::Name => !m.cwd_sort.ascending,
+                            //         _ => true,
+                            //     }
+                            // }),
                             match m.cwd_sort.attribute {
                                 EntryAttribute::Name => Action::ReverseSort,
                                 _ => Action::ChangeSortOrder(EntryAttribute::Name),
@@ -560,7 +614,13 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                                 _ => Action::ChangeSortOrder(EntryAttribute::Date),
                             }
                         },
-                        KeyCode::Enter => Action::SelectFirstEntry,
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            Action::TryCursorMoveUp
+                        },
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            Action::TryCursorMoveDown
+                        },
+                        KeyCode::Enter => Action::SelectEntryUnderCursor,
                         KeyCode::Char('q') => Action::Quit,
                         _ => Action::Noop,
                     }
@@ -602,7 +662,13 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                                 },
                             }
                         },
-                        KeyCode::Enter => Action::SelectFirstEntry,
+                        KeyCode::Up => {
+                            Action::TryCursorMoveUp
+                        },
+                        KeyCode::Down => {
+                            Action::TryCursorMoveDown
+                        },
+                        KeyCode::Enter => Action::SelectEntryUnderCursor,
                         _ => Action::Noop,
                     }
                 },
@@ -613,10 +679,11 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
     // update state
     match action {
         Action::GotoDir(pathbuf) => {
-            m.sorted_entries= read_directory_contents_into_sorted(&pathbuf, m.cwd_sort);
-            m.mode = Mode::Filter;
-            m.cwd = pathbuf;
             m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
+            m.sorted_entries = read_directory_contents_into_sorted(&pathbuf, m.cwd_sort);
+            m.cwd = pathbuf;
+            m.mode = Mode::Filter;
+            m.list_view.reset_with_items(m.sorted_entries.clone());
             Some(())
         },
         Action::SetFilterText(text) => {
@@ -625,37 +692,55 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                 false => Mode::Filter,
             };
             m.filter_text = text;
+
+            let filtered_entries =  m.sorted_entries
+                .clone()
+                .into_iter()
+                .filter(|entry| entry.name.0.to_lowercase().contains(&m.filter_text.to_lowercase()) )
+                .collect::<Vec<Entry>>();
+
+            m.list_view.reset_with_items(filtered_entries);
+
             Some(())
         },
-        Action::SelectFirstEntry => {
-            let first = m.sorted_entries // sorted_entries
-                .iter()
-                .filter(|entry| entry.name.0.to_lowercase().contains(&m.filter_text.to_lowercase()) )
-                .filter(|entry| entry.is_dir )
-                .next();
-            match first {
-                Some(entry) => {
-                    m.cwd = entry.path.clone();
-                    m.sorted_entries = read_directory_contents_into_sorted(&entry.path, m.cwd_sort);
-                    m.mode = Mode::Filter;
-                    m.filter_text = "".to_string();
-                    m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
-                    Some(())
-                },
-                None => Some(()),
+        Action::SelectEntryUnderCursor => {
+            // if no cursor, cant do anything
+            if m.list_view.items.len() == 0 { return Some(()); }
+
+            let entry = &m.list_view.items[m.list_view.cursor_index];
+
+            if entry.is_dir {
+                m.cwd = entry.path.clone();
+                m.sorted_entries = read_directory_contents_into_sorted(&entry.path, m.cwd_sort);
+                m.mode = Mode::Filter;
+                m.filter_text = "".to_string();
+                m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
+                m.list_view.reset_with_items(m.sorted_entries.clone());
             }
+            Some(())
         },
         Action::ChangeSortOrder(attribute) => {
+            // TODO - consider preserving hovered entry by finding it in the new sorted vec,
+            // and updating cursor_index accordingly,
+            // instead of just resetting to top
             m.cwd_sort.attribute = attribute;
             m.cwd_sort.ascending = true;
-            // m.cwd_sort = SortBy { attribute: attribute, ascending: true };
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
+            m.list_view.reset_with_items(m.sorted_entries.clone());
             Some(())
         },
         Action::ReverseSort => {
             m.cwd_sort.ascending = !m.cwd_sort.ascending;
-            // m.cwd_sort = SortBy { attribute: m.cwd_sort.attribute, ascending: !m.cwd_sort.ascending };
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
+            m.list_view.reset_with_items(m.sorted_entries.clone());
+            Some(())
+        },
+        Action::TryCursorMoveUp => {
+            m.list_view.decrement_cursor();
+            Some(())
+        },
+        Action::TryCursorMoveDown => {
+            m.list_view.increment_cursor();
             Some(())
         },
         Action::StartFilterMode => {
@@ -713,12 +798,19 @@ fn view(m: &Model, stdout: &mut std::io::Stdout) {
             queue!(stdout, Print(divider), MoveToNextLine(1));
         };
     }
+    #[macro_export]
+    macro_rules! empty_line {
+        () => {
+            queue!(stdout, MoveToNextLine(1));
+        };
+    }
     
     view_cwd(m, stdout);            // height = 2
     divider!();                     // height = 1
     view_column_headers(m, stdout); // height = 1
     divider!();                     // height = 1
     view_list_body(m, stdout, m.rows - NUM_ROWS_OUTSIDE_LISTVIEW); 
+    empty_line!();                  // height = 1
     divider!();                     // height = 1
     view_footer(m, stdout);         // height = 1
 }
@@ -745,15 +837,6 @@ fn view_column_headers(m: &Model, stdout: &mut std::io::Stdout) {
 }
 
 fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
-    // display slice of items, from first viewable to last, and including cursor
-
-    // let filtered_entres = m.list_view.items;
-    let filtered_entries = m.sorted_entries
-        .clone()
-        .into_iter()
-        .filter(|entry| entry.name.0.to_lowercase().contains(&m.filter_text.to_lowercase()) )
-        .collect::<Vec<Entry>>();
-
     // example of displaying list_view.items and indexes:
     //
     // 0 - out of view
@@ -768,10 +851,9 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
     // first_viewable_index = 1
     // max_items_visible = 4
 
-    // iterate over viewable items
-    let viewable_entries = filtered_entries.iter()
+    let viewable_entries = m.list_view.items.iter()
         .skip(m.list_view.first_viewable_index)
-        .take(m.list_view.max_items_visible - 1); // decided to leave 1 empty row as bottom margin
+        .take(m.list_view.max_items_visible); 
 
     for (visible_index, entry) in viewable_entries.enumerate() {
         let name = &entry.name.0.clone();
@@ -801,15 +883,12 @@ fn view_list_body(m: &Model, stdout: &mut std::io::Stdout, height: usize) {
     }
 
     // skip possible empty space and move to footer
-    if m.list_view.max_items_visible > filtered_entries.len() {
+    if m.list_view.max_items_visible > m.list_view.items.len() {
         let empty_rows : u16 = (
-            m.list_view.max_items_visible - filtered_entries.len()
+            m.list_view.max_items_visible - m.list_view.items.len()
         ).try_into().unwrap();
 
         queue!(stdout, MoveToNextLine(empty_rows));
-    }
-    else {
-        queue!(stdout, MoveToNextLine(1));
     }
 }
 

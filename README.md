@@ -116,11 +116,11 @@ Here's what my `fmin` installation looks like:
 
 <!-- more comfortable than the shell could ever be, yet plays well with shell scripts -->
 
-1) move up and down in entry list, incl arrow keys in filter mode and `j/k` in normal mode. which means implementing flexible list view.
+Immediate feature todos:
 
-2) implement jumptodir feature by tracking frecency in flat file db
+1) implement jumptodir feature by tracking frecency in flat file db
 
-3) `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
+2) `open with...` or `open` command. let user define behavior for selecting files (ie. when Enter on a file, run user script like `browser --open-html-file $FMIN_SELECTED`). would have to work per file extension types. EDIT - actually would be nice to choose each time, even ignoring file extension, at least as a choice. eg. one time open a .pdf with vim and another time open it in browser. "ctrl+p -> open with... vim()" or "ctrl+p open with minbrowser()". see also windows console commands `start file` which i think does the same as `explorer file`
 
 --- 
 
