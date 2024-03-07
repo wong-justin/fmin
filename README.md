@@ -33,13 +33,11 @@ see `main.rs::update()` for all keybindings
 (while early development) `git clone https://github.com/wong-justin/fmin.git` then build.
 
 <!--
-Note that `fmin` writes to three files:
+Note that `fmin` writes to two files:
 
 ___
 
 - `$FMIN_HOME/fmin.history`, which tracks visited directories. Necessary to accumulate popular paths over time
-
-- `$FMIN_HOME/fmin.cwd`, which contains the most recently viewed directory. Useful to `cd` to where `fmin` exited
 
 - `$FMIN_HOME/fmin.highlighted_path`, which contains the path currently under `fmin`'s cursor. Useful for scripting custom commands
 
@@ -48,7 +46,6 @@ IF `$FMIN_HOME` is not set at runtime, `fmin` will create a directory named `.fm
 Here's what a zero-config installation might look like after `fmin` runs:
 ```
 └── $HOME/.fmin/
-    ├── fmin.cwd
     ├── fmin.history
     └── fmin.highlighted_path
 ...
@@ -59,9 +56,14 @@ Here's what a zero-config installation might look like after `fmin` runs:
 ## Configuration
 
 `fmin` works out of the box with zero configuration.
-<!--
 But I recommend using a startup script:
 
+```
+#!/bin/sh
+cd $(path/to/fmin)
+```
+
+<!--
 ```
 #!/bin/sh
 
@@ -86,21 +88,16 @@ set FMIN_CMD_5 '#safe remove \
   mv (cat $FMIN_HOME/fmin.selected_paths) ~/trash/'
 
 # start the fmin binary
+# when finished, cd this shell session to fmin's last directory
 # [change this path]
 
-/wherever/you/put/fmin
-
-# when finished, cd this shell session to fmin's last directory
-# [no need to change this]
-
-cd (cat $FMIN_HOME/fmin.cwd)
+cd $(/wherever/you/put/fmin)
 ```
 
 Here's what my `fmin` installation looks like:
 
 ```
 └── $FMIN_HOME/
-    ├── fmin.cwd
     ├── fmin.history
     ├── fmin.highlighted_path
     ├── fmin
@@ -135,8 +132,6 @@ Immediate feature todos:
 <details>
 <summary>other important things to do</summary>
 
-- cd shell session to last dir when exiting fmin. see: https://github.com/dylanaraps/fff?tab=readme-ov-file#fish
-
 - clear jumptodir history eventually.. after 90days? after ranking score is at minimum? give script to clear all with minimum possible ranking score of 1 for user to manually execute (probs as one of the .sh functions to import intop command palette?)
 
 - consider using two env vars `$FMIN_CWD` and `$FMIN_SELECTED` that stay updated so user can shell out and use them when needed. maybe also `$FMIN_OPEN=myscript.sh` as a means to import that important and custom feature. note though that multiline env var values cause problmes with `env` command, so $FMIN_SELECTED cant be newline-separated. 
@@ -151,9 +146,8 @@ Immediate feature todos:
 	fmin
 	cd (cat /tmp/fmin.cwd)
 	```
+	- actually `fmin` writes cwd to stdout now! so just `cd $(fmin)`
 	- investigate std::env::set_current_dir as an alternative to $FMIN_CWD
-	- also investigate create globalenv. EDIT - seems to hardcode a few expected paths for shell binaries and .env files; only mentions zsh/bash, not fish shell
-	- and also this related comment: "EDIT: The closest you may be able to get, is to take a page out of ssh-agent's book. Have your program emit "export" directives. Then to use it you can run eval $(myprog)"
 	- see also the terminal file manager that uses env vars for config: https://github.com/dylanaraps/fff?tab=readme-ov-file
 which apparently uses a little-known young standard $CDPATH that i might be interested in. EDIT - i dont like cdpath and it seems pretty rare and nonstandard. it's pretty much a manually set home path per session
 	- consider also: $FMIN_DELETE=rm by default, or 'mv $ /trash/'
@@ -161,16 +155,7 @@ which apparently uses a little-known young standard $CDPATH that i might be inte
 
 - performance optimization on large dirs, which is important bc slowness in large dirs was one of the main reasons for ditching fman: 
 
-	- `read_directory_contents(dir, sortby) returns -> Vec<Entry>`, creating a list and inserting in sorted order, eg.
-```
-sorted = new vec()
-for e in entries:
-  match vec.binary_search(compare_key, e)
-    less => vec.insertbefore
-    greater | equal => vec.insertafter/insertat
-```
-
-	- also to help large dirs go faster: only read filenames first and be ready to display, then if that took a long time (or huersitic if dir has >1000 files) only display filenames with metadata (loading), and iterate thru entries to get metadata and finish displaying with that second step
+	- maybe to help large dirs go faster: only read filenames first and be ready to display, then if that took a long time (or huersitic if dir has >1000 files) only display filenames with metadata (loading), and iterate thru entries to get metadata and finish displaying with that second step
 eg. displaying newly entered directory, part 1
 ```
 ___________________________________________
@@ -192,6 +177,8 @@ second step will read metadata date and size and calc display. also note im doin
 	- bonus points if program is still responsive to keypresses, especially between 1st and 2nd steps while metadata is loading
 	- MUST measure performance between both options tho - try creating perf test then git branch to test new implementation
 	- also, if i already have sorted vec<entry> and i know view_start and view_end, then i only need to format strings for entries between view_start and view_end before displaying, instead of formatting each entry in whole vec. also memoization will help if i structure the code to make repeat formatting calls
+	- note that fman slowness was in the order of seconds, and so far my longest load times are less than a second. so maybe this is not as huge a priority as previously thought
+	- also note that perhaps the essential I/O of reading a directory is taking the majority of the time, and these other improvements might be negiligble and not worth the effort. I should make a flamegraph
 
 - also consider caching large dir results, and having filewatcher processes knowing when to clear the cache id the dir is modified
 
@@ -226,8 +213,6 @@ or consider also zero cli options, and all config happens in env vars
 - use docopt for cli options, and maybe just a quick and dirty custom implementation instead of the full library/dsl since that repo sounded problematic and not worth a dependency, and most complexity should live in the tui and not the cli anyways. i just like docopt
 
 - redundant hotkeys: ctrl+j == > or something for jumptodir, ctrl+p == : for command palette, and ctrl+f == / for filter/search. bc control keys are good from any mode, whereas typical vim mode you have to escape back to normal mode before entering another. although reminder to self that many ctrl+key presses are reserved terminal shortcuts, so try not to override them
-
-- provide option to import shell functions, like from a .sh as a config file, like plugins? eg. `fn unzip() {tar -xzf $FMIN_SELECTED }` or whatever, and `unzip` shows up in command palette
 
 - other plugin function ideas: print width/height for img/video files, duration of audio/video files, batch rename selected? (eg. img_01, img_02, etc), copy cwd abs path to clipboard
 
@@ -264,7 +249,6 @@ like use `display::CompactWidth/Condensed/Comfortable` if name_col is less than 
 
 - consider caching Format trait on Date and Size, in case it helps
 
-- looks like windows build has screen flicker each redraw - sad. at least theres always wsl. probably fixable by rewriting view to do partical screen updates instead of redraws top to bottom. also tiny windows interesting thing - looks like terminal height returns one less row than wsl/linux terminal height - maybe windows forces an extra blank line at the end
 </details>
 
 <details>
@@ -291,6 +275,8 @@ the main ones:
 	- undo for commands rename/copy/delete (probably difficult, and less important if these dont happen by accident. also if delete is aliased to `mv $trash`)
 
 - midnight commander has lots of arcane keybindings, including function keys all the way at the top of the keyboard, and a bit of chording; ideally the command palette is the opposite experience, that is, immediately understandable and productive, with minimal learning curve
+
+- i found this other windows text-view file manager: https://www.farmanager.com/screenshots.php?l=en
 
 </details>
 
