@@ -1,6 +1,6 @@
 # fmin
 
-A terminal file manager inspired by [fman](https://fman.io/).
+A quick-to-navigate terminal file manager inspired by [fman](https://fman.io/).
 
 ![screenshot](./demo/screenshot.png)
 
@@ -8,23 +8,23 @@ A terminal file manager inspired by [fman](https://fman.io/).
 
 - `Enter` to nav forward, `Backspace` to nav back
 
-<!-- - type to filter directory contents, `Esc` to clear; capital letters reserved (see below) -->
-- type to filter directory contents, `Esc` to clear
+- type to filter directory contents, `Esc` to clear; capital letters reserved - see below
 
-<!--
 - `Shift+J/K` to nav up/down
 
+- sort by `Shift+N` file **N**ame, `Shift+S` file **S**ize, or `Shift+M` date **M**odified
+
+<!--
 - `Shift+P`: open command palette of operations like copy/paste, as well as imported shell scripts
 
 - `Shift+O`: jump to frequently visited directories
-
-- sort by `Shift+N` file **n**ame, `Shift+S` file **s**ize, or `Shift+M` date **m**odified
 -->
 
 <!-- Shift + Space to mark as selected?? -->
 
 <!-- - `Shift+Q` or `Ctrl+C` to quit -->
-- `Ctrl+C` to quit
+
+- `Shift+Q` or `Ctrl+C` to quit
 
 see `main.rs::update()` for all keybindings
 
@@ -33,13 +33,7 @@ see `main.rs::update()` for all keybindings
 (while early development) `git clone https://github.com/wong-justin/fmin.git` then build.
 
 <!--
-Note that `fmin` writes to two files:
-
-___
-
-- `$FMIN_HOME/fmin.history`, which tracks visited directories. Necessary to accumulate popular paths over time
-
-- `$FMIN_HOME/fmin.highlighted_path`, which contains the path currently under `fmin`'s cursor. Useful for scripting custom commands
+Note that `fmin` tracks visited directories in a file `.fmin_history`.
 
 IF `$FMIN_HOME` is not set at runtime, `fmin` will create a directory named `.fmin/` according to the xdg_home spec, namely at 1) ..., 2)... , or 3) ...
 

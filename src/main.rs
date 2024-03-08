@@ -645,6 +645,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                             },
                             // KeyCode::Char('O') => Action::StartJumpMode,
                             // KeyCode::Char('P') => Action::StartCommandPaletteMode,
+                            KeyCode::Char('Q') => Action::Quit,
                             _ => Action::Noop,
                         },
                         _ => match keyevent.code {
