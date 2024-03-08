@@ -50,12 +50,7 @@ Here's what a zero-config installation might look like after `fmin` runs:
 ## Configuration
 
 `fmin` works out of the box with zero configuration.
-But I recommend using a startup script:
-
-```
-#!/bin/sh
-cd $(path/to/fmin)
-```
+But I recommend using a shell alias: `alias fmin='cd $(/path/to/fmin)'`
 
 <!--
 ```
