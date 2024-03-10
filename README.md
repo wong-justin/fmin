@@ -1,6 +1,6 @@
 # fmin
 
-A quick-to-navigate terminal file manager inspired by [fman](https://fman.io/).
+A terminal file manager inspired by [fman](https://fman.io/), focused on quick navigation.
 
 ![screenshot](./demo/screenshot.png)
 
@@ -33,9 +33,9 @@ see `main.rs::update()` for all keybindings
 (while early development) `git clone https://github.com/wong-justin/fmin.git` then build.
 
 <!--
-Note that `fmin` tracks visited directories in a file `.fmin_history`.
+`fmin` creates a couple files in `$FMIN_HOME` if it exists, else `$HOME/.fmin/`.
 
-IF `$FMIN_HOME` is not set at runtime, `fmin` will create a directory named `.fmin/` according to the xdg_home spec, namely at 1) ..., 2)... , or 3) ...
+Note that `fmin` tracks visited directories in a file `.fmin_history`.
 
 Here's what a zero-config installation might look like after `fmin` runs:
 ```
