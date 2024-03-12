@@ -810,6 +810,7 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     //  https://raw.githubusercontent.com/ranger/ranger-assets/master/screenshots/multipane.png
     
     let divider : &str = &"-".repeat(m.cols);
+    let spacer : &str = &" ".repeat(m.cols);
     #[macro_export]
     macro_rules! divider {
         () => {
@@ -819,7 +820,7 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     #[macro_export]
     macro_rules! empty_line {
         () => {
-            queue!(stderr, MoveToNextLine(1));
+            queue!(stderr, Print(spacer), MoveToNextLine(1));
         };
     }
     queue!(stderr, crossterm::cursor::Hide);
