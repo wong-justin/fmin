@@ -313,7 +313,7 @@ const SIZE_COLUMN_WIDTH : usize = 7;
 const DATE_COLUMN_WIDTH : usize = 14;
 const MARGIN_WIDTH : usize = 2;
 const MARGIN : &str = "  ";
-const NUM_ROWS_OUTSIDE_LISTVIEW : usize = 8;
+const NUM_ROWS_OUTSIDE_LISTVIEW : usize = 6;
 
 impl ListViewData {
     // fn new(items: Vec<Entry>) {
@@ -825,21 +825,22 @@ fn view(m: &Model, stderr: &mut std::io::Stderr) {
     }
     queue!(stderr, crossterm::cursor::Hide);
 
-    view_cwd(m, stderr);            // height = 2
+    view_cwd(m, stderr);            // height = 1 // 2
     divider!();                     // height = 1
     view_column_headers(m, stderr); // height = 1
     divider!();                     // height = 1
     view_list_body(m, stderr);      // height = m.rows - 8
-    empty_line!();                  // height = 1
+    // empty_line!();                  // height = 1
     divider!();                     // height = 1
     view_footer(m, stderr);         // height = 1
+    // empty_line!();                  // height = 1
 }
 
 fn view_cwd(m: &Model, stderr: &mut std::io::Stderr) {
     queue!(stderr,
            MoveTo(0,0),
-           Print(" ".repeat(m.cols)), 
-           MoveToNextLine(1),
+           // Print(" ".repeat(m.cols)), 
+           // MoveToNextLine(1),
            fit(&format!(" {}", m.cwd.display()), m.cols),
            MoveToNextLine(1)
     );
