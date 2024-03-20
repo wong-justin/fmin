@@ -29,7 +29,7 @@ use crossterm::{
 };
 use log::{info};
 
-use crate::tui_program::Program;
+use crate::tui_program::{Program, AppResult};
 
 mod tui_program;
 
@@ -553,7 +553,7 @@ fn init() -> Model {
     }
 }
 
-fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
+fn update(m: &mut Model, terminal_event: Event) -> AppResult {
     // exit early if ctrl+c, no matter what
     // returning None means to quit the program
     // TODO - have a better return type than None/Some(())
@@ -564,14 +564,14 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                 keyevent.modifiers == KeyModifiers::CONTROL &&
                 keyevent.code == KeyCode::Char('c')
             {
-                return None;
+                return AppResult::Finish;
             }
         },
         Event::Resize(cols, rows) => {
             m.cols = usize::from(cols);
             m.rows = usize::from(rows);
             m.list_view.max_items_visible = m.rows - NUM_ROWS_OUTSIDE_LISTVIEW;
-        }
+        },
         _ => ()
     };
     // respond to crossterm event and output an action
@@ -702,7 +702,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             m.cwd = pathbuf;
             m.mode = Mode::Filter;
             m.list_view.reset_with_items(m.sorted_entries.clone());
-            Some(())
+            AppResult::Continue
         },
         Action::SetFilterText(text) => {
             // m.mode = match text.is_empty() {
@@ -718,12 +718,11 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                 .collect::<Vec<Entry>>();
 
             m.list_view.reset_with_items(filtered_entries);
-
-            Some(())
+            AppResult::Continue
         },
         Action::SelectEntryUnderCursor => {
             // if no cursor, cant do anything
-            if m.list_view.items.len() == 0 { return Some(()); }
+            if m.list_view.items.len() == 0 { return AppResult::Continue; }
 
             let entry = &m.list_view.items[m.list_view.cursor_index];
 
@@ -735,7 +734,7 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
                 m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
                 m.list_view.reset_with_items(m.sorted_entries.clone());
             }
-            Some(())
+            AppResult::Continue
         },
         Action::ChangeSortOrder(attribute) => {
             // TODO - consider preserving hovered entry by finding it in the new sorted vec,
@@ -745,28 +744,28 @@ fn update(m: &mut Model, terminal_event: Event) -> Option<()> {
             m.cwd_sort.ascending = true;
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             m.list_view.reset_with_items(m.sorted_entries.clone());
-            Some(())
+            AppResult::Continue
         },
         Action::ReverseSort => {
             m.cwd_sort.ascending = !m.cwd_sort.ascending;
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             m.list_view.reset_with_items(m.sorted_entries.clone());
-            Some(())
+            AppResult::Continue
         },
         Action::TryCursorMoveUp => {
             m.list_view.decrement_cursor();
-            Some(())
+            AppResult::Continue
         },
         Action::TryCursorMoveDown => {
             m.list_view.increment_cursor();
-            Some(())
+            AppResult::Continue
         },
         Action::StartFilterMode => {
             m.mode = Mode::Filter;
-            Some(())
+            AppResult::Continue
         },
-        Action::Noop => Some(()),
-        Action::Quit => None,
+        Action::Noop => AppResult::Continue,
+        Action::Quit => AppResult::Finish,
     }
 }
 
