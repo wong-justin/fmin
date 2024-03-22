@@ -49,6 +49,9 @@ impl<Init, View, Update> Program<Init, View, Update> {
         // like `cd (fmin)`
         let mut stderr = std::io::stderr();
 
+        let mut model = init()?; // quit early here if init fails
+        let mut result = UpdateResult::Continue;
+
         // disables some behavior like line wrapping and catching Enter presses
         // because i will handle those myself
         // https://docs.rs/crossterm/latest/crossterm/terminal/index.html#raw-mode
@@ -60,8 +63,6 @@ impl<Init, View, Update> Program<Init, View, Update> {
                crossterm::cursor::EnableBlinking, // for indicating focus of text inputs; cursor will be hidden anyways in other modes
         );
 
-        let mut model = init()?; // quit early here if init fails
-        let mut result = UpdateResult::Continue;
         view(&model, &mut stderr);
         stderr.flush();
 
