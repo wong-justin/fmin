@@ -520,11 +520,14 @@ fn sort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
 // --- UPDATES AND APP LOGIC --- //
 
 fn main() {
-    let final_model = Program {init, view, update}.run();
-    print!("{}", final_model.cwd.display());
+    let program_result = Program {init, view, update}.run();
+    match program_result {
+        Ok(model) => write!(std::io::stdout(), "{}", model.cwd.display()),
+        Err(msg) => write!(std::io::stderr(), "Error: {}", msg.to_string()),
+    };
 }
 
-fn init() -> Model {
+fn init() -> Result<Model, String> {
     let cwd = std::env::current_dir().unwrap();
     let sort = SortBy{ attribute: EntryAttribute::Name, ascending: true };
     let sorted_entries = read_directory_contents_into_sorted(&cwd, sort);
@@ -532,7 +535,7 @@ fn init() -> Model {
         Ok((cols, rows)) => (usize::from(cols), usize::from(rows)),
         // TODO: respond to error of not knowing terminal size ("give up, you dont have what fmin
         // needs" ?)
-        Err(err) => (0,0)
+        Err(_) => return Err("can't read terminal size".to_string()),
     };
     let list_view = ListViewData {
         items: sorted_entries.clone(), // sorted_entries.map(to_string)
@@ -541,7 +544,82 @@ fn init() -> Model {
         max_items_visible: rows - NUM_ROWS_OUTSIDE_LISTVIEW,
     };
 
-    Model {
+    // Thoughts on dotfiles, env vars, and related conventions:
+    //
+    // I personally don't like the XDG basedir spec (https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)
+    //
+    // 1) the XDG spec defines several directories, including:
+    //    $XDG_DATA_HOME, XDG_CONFIG_HOME, STATE_HOME
+    //    According to the spec, fmin should use most of those dirs
+    //    (write selected files to STATE_HOME/.fmin_selected_filepaths,
+    //     keep history in DATA_HOME/.fmin_history, 
+    //     config file at CONFIG_HOME/.fminrc,
+    //     and use CACHE_HOME if I ever get that serious)
+    //    Too many directories for a tiny tool like fmin, imo.
+    //    Twould be like having `ls` spawn four files all over your system.
+    //    Not to mention my personal preference for portable, self-contained app directories.
+    //    But that's just me.
+    //
+    // 2) the XDG spec also defines fallbacks for each env var, eg. 
+    //    "if $XDG_CONFIG_HOME is not set, a default equal to $HOME/.config should be used."
+    //    Which means the spec defines what to do if you don't follow the spec...
+    //    Or in other words, you can't fully support the XDG spec and non-XDG fallbacks 
+    //      at the same time.
+    //
+    // 3) Some command-line tools have publicly stated they will never break compatibility
+    //    to support XDG; take $HOME/.bashrc, for example.
+    //    Other tools half-heartedly support the XDG spec, 
+    //      and just dump everything to $XDG_CONFIG_HOME if it's set,
+    //        and hope that's enough to satisfy XDG-enjoyers.
+    //    fmin feels similarly.
+    //    Still other tools don't even bother with the XDG spec.
+    //    Very few implement the spec 100%.
+    //
+    // I think XDG-enjoyers mainly care about keeping $HOME clean
+    // and keeping config files in one place / easy to backup.
+    // I agree with those principles, and even if I didn't, it's easy to compromise:
+    //
+    // - put backup-worthy files, or nearly-backup-worthy files in $XDG_CONFIG_HOME if it exists,
+    //  (eg. don't put logs there, or lots of GBs, or too many files)
+    //   XDG-enjoyers are used to this behavior by now,
+    //   and it's easy-to-understand and still portable,
+    //   and the users that want to opt-in this way probably have $XDG_CONFIG_HOME set
+    //
+    // - provide an alternative data home var like $FMIN_HOME,
+    //   which gives more control as a last resort to users with the nichest preferences,
+    //   like 100%-XDG-adhererent users, or people that don't like the next fallback.
+    //   I'm not sure if every tool should have a custom env var home,
+    //   but it feels reasonable to me for now.
+    //   Everything still goes in one folder, which is at worst easy to understand
+    //
+    // - if those env vars are unset, then do the typical $HOME/.dotfile behavior,
+    //   because everyone is used to that,
+    //   and picky people should have developed workarounds by now.
+    //
+    // Ultimately, there will always be tools with dotfiles in $HOME,
+    // and there will always be tools half-hearetedely implementing the XDG spec,
+    // whether or not anyone likes it, and whether or not it's a good spec.
+    //
+    // So I think the best behavior is educating users,
+    // embracing long-running conventions instead of breaking backwards-compatiblity,
+    // giving users an escape hatch for customization 
+    //   (see also config-management options like gnu stow, 
+    //    and leaving ~/ for config while using another dir like ~/mycleanhome/ for personal use,
+    //    and tools with a cli option --config,
+    //    and symlinks)
+    // and minimizing the amount of config needed in the first place.
+
+    let data_dir = match(
+        std::env::var("FMIN_HOME"),
+        std::env::var("XDG_CONFIG_HOME"),
+        std::env::var("HOME"), // TODO - replace with windows env var for home? %USERHOME% or whatver?
+    ) {
+        ( Ok(fmin_home), _, _) => PathBuf::from(fmin_home),
+        ( Err(_), Ok(xdg_home), _ ) => PathBuf::from(xdg_home),
+        ( Err(_), Err(_), Ok(home) ) => PathBuf::from(home).join(".fmin/"),
+        _ => return Err("need to set directory: either $XDG_CONFIG_HOME, $FMIN_HOME, or $HOME".to_string()),
+    };
+    Ok(Model {
         cwd: cwd,
         cwd_sort: sort,
         sorted_entries: sorted_entries,
@@ -550,10 +628,10 @@ fn init() -> Model {
         cols: cols,
         rows: rows,
         list_view: list_view,
-    }
+    })
 }
 
-fn update(m: &mut Model, terminal_event: Event) -> AppResult {
+fn update(m: &mut Model, terminal_event: Event) -> UpdateResult {
     // exit early if ctrl+c, no matter what
     // returning None means to quit the program
     // TODO - have a better return type than None/Some(())
@@ -564,7 +642,7 @@ fn update(m: &mut Model, terminal_event: Event) -> AppResult {
                 keyevent.modifiers == KeyModifiers::CONTROL &&
                 keyevent.code == KeyCode::Char('c')
             {
-                return AppResult::Finish;
+                return UpdateResult::Finish;
             }
         },
         Event::Resize(cols, rows) => {
@@ -702,7 +780,7 @@ fn update(m: &mut Model, terminal_event: Event) -> AppResult {
             m.cwd = pathbuf;
             m.mode = Mode::Filter;
             m.list_view.reset_with_items(m.sorted_entries.clone());
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::SetFilterText(text) => {
             // m.mode = match text.is_empty() {
@@ -718,11 +796,11 @@ fn update(m: &mut Model, terminal_event: Event) -> AppResult {
                 .collect::<Vec<Entry>>();
 
             m.list_view.reset_with_items(filtered_entries);
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::SelectEntryUnderCursor => {
             // if no cursor, cant do anything
-            if m.list_view.items.len() == 0 { return AppResult::Continue; }
+            if m.list_view.items.len() == 0 { return UpdateResult::Continue; }
 
             let entry = &m.list_view.items[m.list_view.cursor_index];
 
@@ -734,7 +812,7 @@ fn update(m: &mut Model, terminal_event: Event) -> AppResult {
                 m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
                 m.list_view.reset_with_items(m.sorted_entries.clone());
             }
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::ChangeSortOrder(attribute) => {
             // TODO - consider preserving hovered entry by finding it in the new sorted vec,
@@ -744,28 +822,28 @@ fn update(m: &mut Model, terminal_event: Event) -> AppResult {
             m.cwd_sort.ascending = true;
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             m.list_view.reset_with_items(m.sorted_entries.clone());
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::ReverseSort => {
             m.cwd_sort.ascending = !m.cwd_sort.ascending;
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             m.list_view.reset_with_items(m.sorted_entries.clone());
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::TryCursorMoveUp => {
             m.list_view.decrement_cursor();
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::TryCursorMoveDown => {
             m.list_view.increment_cursor();
-            AppResult::Continue
+            UpdateResult::Continue
         },
         Action::StartFilterMode => {
             m.mode = Mode::Filter;
-            AppResult::Continue
+            UpdateResult::Continue
         },
-        Action::Noop => AppResult::Continue,
-        Action::Quit => AppResult::Finish,
+        Action::Noop => UpdateResult::Continue,
+        Action::Quit => UpdateResult::Finish,
     }
 }
 

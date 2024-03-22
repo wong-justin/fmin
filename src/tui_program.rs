@@ -28,18 +28,21 @@ pub struct Program<Init, View, Update> {
     pub update: Update,
 }
 
-pub enum AppResult {
+pub enum UpdateResult {
     Continue,
     Finish,
-    FailWithMessage(String),
+    Failed(String)
 }
 
+
 impl<Init, View, Update> Program<Init, View, Update> {
-    pub fn run<Model>(self) -> Model
+    pub fn run<Model>(self) -> Result<Model, String>
     where 
-        Init: FnOnce() -> Model, 
+        Init: FnOnce() -> Result<Model, String>,
         View: Fn(&Model, &mut std::io::Stderr),
-        Update: Fn(&mut Model, Event) -> AppResult, 
+        // update() mutates the model bc I think it's a bit easier and more performant
+        //   than creating a new Model in memory on each update
+        Update: Fn(&mut Model, Event) -> UpdateResult,
     {
         let Self {init, view, update} = self;
         // write all TUI content to stderr, so on finish, stdout can pass information,
@@ -57,8 +60,8 @@ impl<Init, View, Update> Program<Init, View, Update> {
                crossterm::cursor::EnableBlinking, // for indicating focus of text inputs; cursor will be hidden anyways in other modes
         );
 
-        let mut model = init();
-        let mut result = AppResult::Continue;
+        let mut model = init()?; // quit early here if init fails
+        let mut result = UpdateResult::Continue;
         view(&model, &mut stderr);
         stderr.flush();
 
@@ -66,9 +69,12 @@ impl<Init, View, Update> Program<Init, View, Update> {
             let event = await_next_event().unwrap();
             result = update(&mut model, event);
             match result {
-                AppResult::Continue => (),
-                AppResult::Finish => break,
-                AppResult::FailWithMessage(_) => break,
+                UpdateResult::Continue => (),
+                UpdateResult::Finish => break,
+                UpdateResult::Failed(msg) => {
+                    return Err(msg);
+                    () // to satisfy compiler return type
+                }
             };
 
             view(&model, &mut stderr);
@@ -81,12 +87,7 @@ impl<Init, View, Update> Program<Init, View, Update> {
                  terminal::LeaveAlternateScreen,
                  crossterm::cursor::Show,
         );
-        // display failure, if any
-        match result {
-            AppResult::FailWithMessage(msg) => write!(stderr, "{}", msg),
-            _ => std::result::Result::Ok(()) // just to satisfy compiler
-        };
         terminal::disable_raw_mode(); 
-        return model;
+        Ok(model)
     }
 }
