@@ -380,26 +380,6 @@ impl ListViewData {
     // for later: fn toggle_mark_under_cursor() {
 }
 
-trait PrintableRow {
-    // memoize these calls? surely will have repeats during filtering
-    fn print_as_row(&self, width_in_cols: usize) -> &'static str;
-}
-
-impl PrintableRow for Entry {
-    fn print_as_row(&self, width_in_cols: usize) -> &'static str {
-        // let name_width = width_in_cols - SIZE_COLUMN_WIDTH - DATE_COLUMN_WIDTH - 2 * MARGIN_WIDTH;
-        // format!(
-        //     " %s%s%s%s%s",
-        //     fit(name, name_width),
-        //     MARGIN,
-        //     fit_align_right(size, SIZE_COLUMN_WIDTH),
-        //     MARGIN,
-        //     fit(date, DATE_COLUMN_WIDTH),
-        // )
-        return "";
-    }
-}
-
 impl SortBy {
     pub fn compare_entries(&self, a: &Entry, b: &Entry) -> Ordering {
         match &self.attribute {
