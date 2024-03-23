@@ -174,6 +174,8 @@ second step will read metadata date and size and calc display. also note im doin
 - dual pane? or N-pane, with client/server architecture? where server just holds yanked filepaths... kinda overkill. maybe connect with unix pipes? also consider multiplatform... maybe cli option `--pair-with-session` to opt in to a dual pane? --pair-with-last, --print-all-session-ids, --start-background-server
 
 - make sure all rust functions take borrowed struct params, unless they are supposed to take ownership after the function call
+
+- try changing drawing commands to work with newer, in-progress terminal like alacritty. i suspect those terminals haven't implemented ansi codes like MoveLinesUp. so replace with more basic drawing commands, like maybe MoveTo. EDIT - note that fmin inside tmux inside alacritty, renders well, but fmin in alacritty without tmux breaks
 </details>
 
 <details>
@@ -200,6 +202,8 @@ or consider also zero cli options, and all config happens in env vars
 - be able to delete directories in frecency list (rather than opening flat history db file and editing / deleting lines). Note that some dirs temporarily appear and disappear, like USBs, and those should never be deleted automatically just because they arent present at a certain moment
 
 - use docopt for cli options, and maybe just a quick and dirty custom implementation instead of the full library/dsl since that repo sounded problematic and not worth a dependency, and most complexity should live in the tui and not the cli anyways. i just like docopt
+
+- consider cli option `fmin <starting_dir>`; useful for scripting from another process, like maybe `/my/other/shell fmin but/still/this/cwd`
 
 - redundant hotkeys: ctrl+j == > or something for jumptodir, ctrl+p == : for command palette, and ctrl+f == / for filter/search. bc control keys are good from any mode, whereas typical vim mode you have to escape back to normal mode before entering another. although reminder to self that many ctrl+key presses are reserved terminal shortcuts, so try not to override them
 
@@ -267,6 +271,10 @@ the main ones:
 
 - i found this other windows text-view file manager: https://www.farmanager.com/screenshots.php?l=en
 
+- bug to investigate: high CPU usage for long running program; i think it's fmin but not sure; a couple fish processes reported in windows task manager, only appearing since fmin development
+
+- another bug to investigate: terminal not returning to normal mode after fmin quit; i think it has to do with line wrapping. to reproduce: use fmin, then fish shell tab autcomplete to wrap line
+
 </details>
 
 ## feedback welcome; also some questions im wondering about
@@ -288,7 +296,7 @@ that would get ugly quick tho. and poor design because cli options are designed 
 
 - how do non-american keyboards use vim hotkeys and other ascii char usecases, eg. WASD for games? will those keyboards still be able to input a-z,ctrl+[a-z],shift+[a-z] easily? do power users usually have a qwerty remap layer for these kinds of programs?
 
-- any cleanish, faster alternatives to the model-update-view application loop that avoids writing so many bytes to stdout each update frame? the current way feels a tad slow. or maybe windows terminal is just getting too slow for me personally, and it's not so much the application's fault
+- any cleanish, faster alternatives to the model-update-view application loop that avoids writing so many bytes to stdout each update frame? the current way feels a tad slow. or maybe windows terminal is just getting too slow for me personally, and it's not so much the application's fault. EDIT - yes, windows terminal was slowing input latency a lot; alacritty feels much smoother
 
 - is it possible / worth incorporating tools for fuzzy matching and frecency tracking, like [fzf](https://github.com/junegunn/fzf) and [z](https://github.com/rupa/z)? in my opinion, it seems like a pain to integrate those shell tools, between code interface and user setup/installation, compared to reimplementing the basic functionality in rust (eg. string substring match instead of fuzzy match)
 
