@@ -50,7 +50,6 @@ impl<Init, View, Update> Program<Init, View, Update> {
         let mut stderr = std::io::stderr();
 
         let mut model = init()?; // quit early here if init fails
-        let mut result = UpdateResult::Continue;
 
         // disables some behavior like line wrapping and catching Enter presses
         // because i will handle those myself
@@ -68,8 +67,7 @@ impl<Init, View, Update> Program<Init, View, Update> {
 
         loop {
             let event = await_next_event().unwrap();
-            result = update(&mut model, event);
-            match result {
+            match update(&mut model, event) {
                 UpdateResult::Continue => (),
                 UpdateResult::Finish => break,
                 UpdateResult::Failed(msg) => {
