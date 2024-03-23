@@ -6,9 +6,9 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter, Error};
-use std::fs::DirEntry;
+use std::fs::{DirEntry, File};
 use std::hash::{Hash, Hasher};
-use std::io::{Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use binary_heap_plus::BinaryHeap;
@@ -29,9 +29,34 @@ use crossterm::{
 };
 use log::{info};
 
-use crate::tui_program::{Program, AppResult};
+use crate::tui_program::{Program, UpdateResult};
 
 mod tui_program;
+
+// --- for debugging
+
+struct LoggerToFile<'a> {
+    path: &'a str,
+}
+
+impl log::Log for LoggerToFile<'_> {
+    fn flush(&self) {}
+    fn enabled(&self, metadata: &log::Metadata) -> bool { true }
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&self.path)
+                // not sure what to do when log file breaks
+                // either silently fail or crash. i choose crash
+                .expect("failure to open or read log file");
+            writeln!(file, "{}", record.args());
+        }
+    }
+}
+
+static LOGGER : LoggerToFile = LoggerToFile { path: "/tmp/fmin_log" };
 
 // --- MODEL, and other data structures --- //
 
@@ -51,6 +76,8 @@ struct Model {
     cols: usize,
     rows: usize,
     list_view: ListViewData,
+    history_filepath: PathBuf,
+    history: HashSet<HistoryRecord>,
 }
 
 struct Entry {
@@ -86,6 +113,16 @@ enum Action {
     Noop,
     Quit,
 }
+
+#[derive(Eq, Hash, PartialEq, Debug)]
+struct HistoryRecord {
+    path: String,
+    frequency: usize,
+    // preferred_sort, or last_sort: SortBy,
+}
+
+struct FailedToReadHistory;
+struct FailedToWriteHistory;
 
 #[derive(Copy, Clone, PartialEq)]
 enum EntryAttribute {
@@ -459,6 +496,44 @@ impl std::convert::From<DirEntry> for Entry {
     }
 }
 
+impl std::convert::From<std::io::Error> for FailedToReadHistory {
+    fn from(err: std::io::Error) -> Self { FailedToReadHistory }
+}
+
+impl std::convert::From<std::num::ParseIntError> for FailedToReadHistory {
+   fn from(err: std::num::ParseIntError) -> Self { FailedToReadHistory }
+}
+
+impl std::convert::From<std::io::Error> for FailedToWriteHistory {
+    fn from(err: std::io::Error) -> Self { FailedToWriteHistory }
+}
+
+
+impl Display for HistoryRecord {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        // example: "1,my/path"
+        write!(f, "{},{}", self.frequency, self.path)
+    }
+}
+
+impl std::convert::TryFrom<String> for HistoryRecord {
+    type Error = FailedToReadHistory;
+
+    fn try_from(record_string: String) -> Result<Self, Self::Error> {
+        // example of expected record_string: "1,my/path"
+        let mut chars = record_string.chars();
+        let frequency : usize = chars
+            .by_ref()
+            .take_while(|&c| c != ',')
+            .collect::<String>()
+            .parse()?;
+
+        let path : String = chars
+            .by_ref()
+            .collect::<String>();
+        Ok( Self { path: path, frequency: frequency} )
+    }
+}
 
 fn read_directory_contents_into_sorted(dir: &PathBuf, sort: SortBy) -> Vec<Entry> {
     // optimization idea: replace this fn with
@@ -497,32 +572,114 @@ fn sort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
     return new_entries;
 }
 
+fn read_history_file(filename: &PathBuf) -> Result<HashSet<HistoryRecord>, FailedToReadHistory> {
+    // input:
+    // 123,/my/path
+    // 45,/another/path
+    let mut history = HashSet::<HistoryRecord>::new();
+
+    let file = File::open(filename)?;
+
+    // line reading taken from:
+    // https://doc.rust-lang.org/rust-by-example/std_misc/file/read_lines.html 
+    for line in BufReader::new(file).lines() {
+        // hope reading line is Ok,
+        // and hope parsing line in HistoryRecord::from is Ok
+        // else return Err type of this function
+        let record = HistoryRecord::try_from(line?)?; 
+        history.insert(record);
+    }
+    Ok(history)
+}
+
+fn write_history_file(history: HashSet<HistoryRecord>, filepath: PathBuf) -> Result<(), FailedToWriteHistory> {
+    // output:
+    // 123,/my/path
+    // 45,/another/path
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(&filepath)?;
+
+    let line_separated_records = history
+        .iter()
+        .map(HistoryRecord::to_string)
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    file.write(line_separated_records.as_bytes())?;
+    Ok(())
+}
+
 // --- UPDATES AND APP LOGIC --- //
 
 fn main() {
     let program_result = Program {init, view, update}.run();
     match program_result {
-        Ok(model) => write!(std::io::stdout(), "{}", model.cwd.display()),
-        Err(msg) => write!(std::io::stderr(), "Error: {}", msg.to_string()),
+        Ok(model) => {
+            write!(std::io::stdout(), "{}", model.cwd.display());
+            write_history_file(model.history, model.history_filepath);
+            // maybe should write_history_file on every cwd update?
+        },
+        Err(msg) => {
+            write!(std::io::stderr(), "Error: {}", msg.to_string());
+        }
+        // TODO - on err, still write cwd to stdout so parent script won't fail
     };
 }
 
 fn init() -> Result<Model, String> {
+    log::set_logger(&LOGGER)
+        .map(|()| log::set_max_level(log::LevelFilter::Info));
+
+    log::info!("---\nnew session");
+
     let cwd = std::env::current_dir().unwrap();
     let sort = SortBy{ attribute: EntryAttribute::Name, ascending: true };
     let sorted_entries = read_directory_contents_into_sorted(&cwd, sort);
+    // let (cols, rows) = terminal::size()?;
     let (cols, rows) = match terminal::size() {
         Ok((cols, rows)) => (usize::from(cols), usize::from(rows)),
-        // TODO: respond to error of not knowing terminal size ("give up, you dont have what fmin
-        // needs" ?)
         Err(_) => return Err("can't read terminal size".to_string()),
     };
     let list_view = ListViewData {
-        items: sorted_entries.clone(), // sorted_entries.map(to_string)
+        items: sorted_entries.clone(),
         first_viewable_index: 0,
         cursor_index: 0,
         max_items_visible: rows - NUM_ROWS_OUTSIDE_LISTVIEW,
     };
+
+    // TODO
+    // 1 - read env vars $FMIN_HOME and $HOME and acordingly set model.history_filepath
+    // 2 - read history_filepath and init model.history, or init empty if history_filepath doesn't exist. or maybe read history_filepath later to keep startup quick?
+    //
+    // model.history should be of type HashSet<String, usize>
+    // String is the pathbuf name. use string over pathbuf because string will be faster for
+    // reading and writing. usize is frequency of vists
+    //
+    // 3 - on every Action::GotoDir, and also in initial cwd load, increment model.history[cwd]
+    // 4 - on app quit, write model.history to model.history_filepath
+    //
+    // model.history_filepath file contents should be like:
+    // n,1,my/path
+    // S,20,other/path
+    // m,999,path/can have/spaces/and,weirdchars!too.
+    // where n/N/s/S/m/M is sort order, and int is frequency
+    //
+    // to be backwards-compatible: prepend new fields to beginning, and read from end, eg:
+    // chunks = line.split(,)
+    // path = chunks[-1]
+    // freq = chunks[-2]
+    // sort = chunks[-3]
+    // so that old fmin versions can still read new history formats (and new can read old as well).
+    // although this split method assumes filenames dont have commas; replace with custom spplit
+    // method, consuming finite commas starting from beginning. EDIT nvm, that wouldn't be totally
+    // forwads-compatible if i predefined how many fields there were
+    //
+    // model.history should be like
+    // HashSet<PathBuf, Frequency>
+    // or for performance, HashSet<String, usize> so there's less conversions when reading/writing
+    // or HashSet<String, (usize, FileAttribute)> to read sort orders
 
     // Thoughts on dotfiles, env vars, and related conventions:
     //
@@ -595,10 +752,25 @@ fn init() -> Result<Model, String> {
         std::env::var("HOME"), // TODO - replace with windows env var for home? %USERHOME% or whatver?
     ) {
         ( Ok(fmin_home), _, _) => PathBuf::from(fmin_home),
-        ( Err(_), Ok(xdg_home), _ ) => PathBuf::from(xdg_home),
+        ( Err(_), Ok(xdg_config_home), _ ) => PathBuf::from(xdg_config_home),
         ( Err(_), Err(_), Ok(home) ) => PathBuf::from(home).join(".fmin/"),
-        _ => return Err("need to set directory: either $XDG_CONFIG_HOME, $FMIN_HOME, or $HOME".to_string()),
+        _ => return Err("need to set directory: either $FMIN_HOME, $XDG_CONFIG_HOME, or $HOME".to_string()),
     };
+
+    const HISTORY_FILENAME : &str = ".fmin_history";
+    let history_filepath = data_dir.join(HISTORY_FILENAME);
+    let history = match read_history_file(&history_filepath) {
+        Ok(records) => records,
+        Err(FailedToReadHistory) => HashSet::<HistoryRecord>::new(),
+    };
+    // or later, in Action::GotoMode:
+    // let history = match m.history {
+    //     NotInitialized => read_history_file()
+    //     Loaded(records) => 
+    //     Failed => ...
+    // }
+    log::info!("{:?}", history);
+
     Ok(Model {
         cwd: cwd,
         cwd_sort: sort,
@@ -608,6 +780,8 @@ fn init() -> Result<Model, String> {
         cols: cols,
         rows: rows,
         list_view: list_view,
+        history_filepath: history_filepath,
+        history: history,
     })
 }
 
