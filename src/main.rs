@@ -649,37 +649,6 @@ fn init() -> Result<Model, String> {
         max_items_visible: rows - NUM_ROWS_OUTSIDE_LISTVIEW,
     };
 
-    // TODO
-    // 1 - read env vars $FMIN_HOME and $HOME and acordingly set model.history_filepath
-    // 2 - read history_filepath and init model.history, or init empty if history_filepath doesn't exist. or maybe read history_filepath later to keep startup quick?
-    //
-    // model.history should be of type HashSet<String, usize>
-    // String is the pathbuf name. use string over pathbuf because string will be faster for
-    // reading and writing. usize is frequency of vists
-    //
-    // 3 - on every Action::GotoDir, and also in initial cwd load, increment model.history[cwd]
-    // 4 - on app quit, write model.history to model.history_filepath
-    //
-    // model.history_filepath file contents should be like:
-    // n,1,my/path
-    // S,20,other/path
-    // m,999,path/can have/spaces/and,weirdchars!too.
-    // where n/N/s/S/m/M is sort order, and int is frequency
-    //
-    // to be backwards-compatible: prepend new fields to beginning, and read from end, eg:
-    // chunks = line.split(,)
-    // path = chunks[-1]
-    // freq = chunks[-2]
-    // sort = chunks[-3]
-    // so that old fmin versions can still read new history formats (and new can read old as well).
-    // although this split method assumes filenames dont have commas; replace with custom spplit
-    // method, consuming finite commas starting from beginning. EDIT nvm, that wouldn't be totally
-    // forwads-compatible if i predefined how many fields there were
-    //
-    // model.history should be like
-    // HashSet<PathBuf, Frequency>
-    // or for performance, HashSet<String, usize> so there's less conversions when reading/writing
-    // or HashSet<String, (usize, FileAttribute)> to read sort orders
 
     // Thoughts on dotfiles, env vars, and related conventions:
     //
