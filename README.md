@@ -1,6 +1,6 @@
 # fmin
 
-A terminal file manager inspired by [fman](https://fman.io/), focused on quick navigation.
+A low-friction terminal file manager, inspired by [fman](https://fman.io/). 
 
 ![screenshot](./demo/screenshot.png)
 
@@ -121,7 +121,11 @@ Immediate feature todos:
 <details>
 <summary>other important things to do</summary>
 
-- clear jumptodir history eventually.. after 90days? after ranking score is at minimum? give script to clear all with minimum possible ranking score of 1 for user to manually execute (probs as one of the .sh functions to import intop command palette?)
+- refactor gotodir code - pull out into common functions, between gotodir and selectundercursor
+
+- refactor + clean history code; figure out whether to use HistoryRecord struct or just tuple (String, usize, etc.)
+
+- clear jumptodir history eventually.. after 90days? after ranking score is at minimum? give script to clear all with minimum possible ranking score of 1 for user to manually execute (probs as one of the .sh functions to import intop command palette?). see this algorithm: - [ ] for fmin matching algorithm: https://github.com/ajeetdsouza/zoxide/wiki/Algorithm#frecency
 
 - consider using two env vars `$FMIN_CWD` and `$FMIN_SELECTED` that stay updated so user can shell out and use them when needed. maybe also `$FMIN_OPEN=myscript.sh` as a means to import that important and custom feature. note though that multiline env var values cause problmes with `env` command, so $FMIN_SELECTED cant be newline-separated. 
 	- note that this is a sort of anti-pattern, hacky way to use env vars; some may find it gross; but i think the resulting feature is a big usability/convenience win, for not much cost
@@ -274,6 +278,8 @@ the main ones:
 - bug to investigate: high CPU usage for long running program; i think it's fmin but not sure; a couple fish processes reported in windows task manager, only appearing since fmin development
 
 - another bug to investigate: terminal not returning to normal mode after fmin quit; i think it has to do with line wrapping. to reproduce: use fmin, then fish shell tab autcomplete to wrap line
+
+- and another bug: history filepaths are written incorrectly, eg "5,/mnt/c/Users/jkwonroot/asciiart" or"7,/mnt/c/Users/jkwon/desktop/programming/fminsciiart/ansi". maybe has to do with the contents of the asciiart/ dir? or maybe that one session was wacky and corrupted somehow?
 
 </details>
 
