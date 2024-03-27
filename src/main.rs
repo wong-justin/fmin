@@ -657,12 +657,12 @@ fn init() -> Result<Model, String> {
     // 1) the XDG spec defines several directories, including:
     //    $XDG_DATA_HOME, XDG_CONFIG_HOME, STATE_HOME
     //    According to the spec, fmin should use most of those dirs
-    //    (write selected files to STATE_HOME/.fmin_selected_filepaths,
+    //    (write selected entries to STATE_HOME/.fmin_selected_filepaths,
     //     keep history in DATA_HOME/.fmin_history, 
     //     config file at CONFIG_HOME/.fminrc,
     //     and use CACHE_HOME if I ever get that serious)
     //    Too many directories for a tiny tool like fmin, imo.
-    //    Twould be like having `ls` spawn four files all over your system.
+    //    Twould be like having `ls` vomit four files all over your system.
     //    Not to mention my personal preference for portable, self-contained app directories.
     //    But that's just me.
     //
@@ -671,66 +671,62 @@ fn init() -> Result<Model, String> {
     //    Which means the spec defines what to do if you don't follow the spec...
     //    Or in other words, you can't fully support the XDG spec and non-XDG fallbacks 
     //      at the same time.
+    //    That's a less-important feature of the spec, tho. Easy to ignore.
     //
-    // 3) Some command-line tools have publicly stated they will never break compatibility
-    //    to support XDG; take $HOME/.bashrc, for example.
+    // 3) Some big old command-line tools have publicly stated they will never 
+    //    break compatibility to support XDG; take $HOME/.bashrc, for example.
     //    Other tools half-heartedly support the XDG spec, 
     //      and just dump everything to $XDG_CONFIG_HOME if it's set,
     //        and hope that's enough to satisfy XDG-enjoyers.
-    //    fmin feels similarly.
     //    Still other tools don't even bother with the XDG spec.
     //    Very few implement the spec 100%.
     //
-    // I think XDG-enjoyers mainly care about keeping $HOME clean
+    // I think users mainly care about keeping $HOME clean
     // and keeping config files in one place / easy to backup.
-    // I agree with those principles, and even if I didn't, it's easy to compromise:
     //
-    // - put backup-worthy files, or nearly-backup-worthy files in $XDG_CONFIG_HOME if it exists,
-    //  (eg. don't put logs there, or lots of GBs, or too many files)
-    //   XDG-enjoyers are used to this behavior by now,
-    //   and it's easy-to-understand and still portable,
-    //   and the users that want to opt-in this way probably have $XDG_CONFIG_HOME set
+    // But supporting the XDG spec is only a few extra LOC. So I might as well do it.
+    // For now, that means putting .fmin_history in $XDG_DATA_HOME if it's set.
     //
-    // - provide an alternative data home var like $FMIN_HOME,
-    //   which gives more control as a last resort to users with the nichest preferences,
-    //   like 100%-XDG-adhererent users, or people that don't like the next fallback.
+    // - fmin provides an alternative data home var like $FMIN_HOME,
+    //   meant for the users that want neither XDG nor naked $HOME.
     //   I'm not sure if every tool should have a custom env var home,
     //   but it feels reasonable to me for now.
-    //   Everything still goes in one folder, which is at worst easy to understand
+    //   Everything goes in one folder, which is at worst easy to understand and control
     //
     // - if those env vars are unset, then do the typical $HOME/.dotfile behavior,
     //   because everyone is used to that,
     //   and picky people should have developed workarounds by now.
     //
     // Ultimately, there will always be tools with dotfiles in $HOME,
-    // and there will always be tools half-hearetedely implementing the XDG spec,
+    // and there will always be tools half-heartedly implementing the XDG spec,
     // whether or not anyone likes it, and whether or not it's a good spec.
     //
     // So I think the best behavior is educating users,
     // embracing long-running conventions instead of breaking backwards-compatiblity,
-    // giving users an escape hatch for customization 
-    //   (see also config-management options like gnu stow, 
-    //    and leaving ~/ for config while using another dir like ~/mycleanhome/ for personal use,
-    //    and tools with a cli option --config,
-    //    and symlinks)
+    // giving users an escape hatch for customization and control over any dotfile
+    //   (see symlinks,
+    //    and symlink management tools like gnu stow,
+    //    and other config-mangement options like
+    //    leaving ~/ for config while using another dir like ~/mycleanhome/ for personal use,
+    //    or perhaps using cli options --config if possible)
     // and minimizing the amount of config needed in the first place.
 
     let data_dir = match(
         std::env::var("FMIN_HOME"),
-        std::env::var("XDG_CONFIG_HOME"),
+        std::env::var("XDG_DATA_HOME"),
         std::env::var("HOME"), // TODO - replace with windows env var for home? %USERHOME% or whatver?
     ) {
         ( Ok(fmin_home), _, _) => PathBuf::from(fmin_home),
         ( Err(_), Ok(xdg_config_home), _ ) => PathBuf::from(xdg_config_home),
         ( Err(_), Err(_), Ok(home) ) => PathBuf::from(home).join(".fmin/"),
-        _ => return Err("need to set directory: either $FMIN_HOME, $XDG_CONFIG_HOME, or $HOME".to_string()),
+        _ => return Err("need to set directory: either $FMIN_HOME, $XDG_DATA_HOME, or $HOME".to_string()),
     };
 
     const HISTORY_FILENAME : &str = ".fmin_history";
     let history_filepath = data_dir.join(HISTORY_FILENAME);
-    let history = match read_history_file(&history_filepath) {
+    let mut history = match read_history_file(&history_filepath) {
         Ok(records) => records,
-        Err(FailedToReadHistory) => HashSet::<HistoryRecord>::new(),
+        Err(FailedToReadHistory) => HashMap::<HistoryPath, HistoryFrequency>::new(),
     };
     // or later, in Action::GotoMode:
     // let history = match m.history {
