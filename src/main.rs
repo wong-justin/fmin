@@ -4,7 +4,7 @@
 #![allow(unused_imports)]
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::fmt::{Display, Formatter, Error};
 use std::fs::{DirEntry, File};
 use std::hash::{Hash, Hasher};
@@ -76,8 +76,23 @@ struct Model {
     cols: usize,
     rows: usize,
     list_view: ListViewData,
+    // model.history_filepath file contents should be like:
+    // n,1,my/path
+    // S,20,other/path
+    // m,999,path/can have/spaces/and,weirdchars!too.
+    // where n/N/s/S/m/M is sort order, and int is frequency
+    //
+    // prepend new fields to beginning, and read from end, eg:
+    // chunks = line.split(,)
+    // path = chunks[-1]
+    // freq = chunks[-2]
+    // sort = chunks[-3]
     history_filepath: PathBuf,
-    history: HashSet<HistoryRecord>,
+    // model.history should be like
+    // HashMap<String=path, (usize=frequency, FileAttribute=sortoder)>
+    // Maybe read history_filepath later to keep startup quick?
+    //
+    history: HashMap<HistoryPath, HistoryFrequency>,
 }
 
 struct Entry {
@@ -572,11 +587,16 @@ fn sort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
     return new_entries;
 }
 
-fn read_history_file(filename: &PathBuf) -> Result<HashSet<HistoryRecord>, FailedToReadHistory> {
+// type HistoryRecord = (String, usize);
+type HistoryPath = String;
+type HistoryFrequency = usize;
+
+fn read_history_file(filename: &PathBuf) -> Result<HashMap<HistoryPath, HistoryFrequency>, FailedToReadHistory> {
     // input:
     // 123,/my/path
     // 45,/another/path
-    let mut history = HashSet::<HistoryRecord>::new();
+    // let mut history = HashSet::<HistoryRecord>::new();
+    let mut history = HashMap::<HistoryPath, HistoryFrequency>::new();
 
     let file = File::open(filename)?;
 
@@ -587,12 +607,12 @@ fn read_history_file(filename: &PathBuf) -> Result<HashSet<HistoryRecord>, Faile
         // and hope parsing line in HistoryRecord::from is Ok
         // else return Err type of this function
         let record = HistoryRecord::try_from(line?)?; 
-        history.insert(record);
+        history.insert(record.path, record.frequency);
     }
     Ok(history)
 }
 
-fn write_history_file(history: HashSet<HistoryRecord>, filepath: PathBuf) -> Result<(), FailedToWriteHistory> {
+fn write_history_file(history: HashMap<HistoryPath, HistoryFrequency>, filepath: PathBuf) -> Result<(), FailedToWriteHistory> {
     // output:
     // 123,/my/path
     // 45,/another/path
@@ -603,12 +623,24 @@ fn write_history_file(history: HashSet<HistoryRecord>, filepath: PathBuf) -> Res
 
     let line_separated_records = history
         .iter()
-        .map(HistoryRecord::to_string)
+        .map( |(path, freq)| 
+            HistoryRecord {
+                path: path.to_string(),
+                frequency: *freq // from borrowed primitive usize to copied/cloned usize
+            }.to_string()
+        )
         .collect::<Vec<String>>()
         .join("\n");
 
     file.write(line_separated_records.as_bytes())?;
     Ok(())
+}
+
+fn increment_history(history: &mut HashMap<HistoryPath, HistoryFrequency>, path: HistoryPath) {
+    history
+        .entry(path)
+        .and_modify( |freq| *freq += 1 )
+        .or_insert(1);
 }
 
 // --- UPDATES AND APP LOGIC --- //
@@ -736,6 +768,8 @@ fn init() -> Result<Model, String> {
     // }
     log::info!("{:?}", history);
 
+    increment_history(&mut history, cwd.display().to_string());
+ 
     Ok(Model {
         cwd: cwd,
         cwd_sort: sort,
@@ -899,6 +933,8 @@ fn update(m: &mut Model, terminal_event: Event) -> UpdateResult {
             m.cwd = pathbuf;
             m.mode = Mode::Filter;
             m.list_view.reset_with_items(m.sorted_entries.clone());
+            increment_history(&mut m.history, m.cwd.display().to_string());
+            // m.history = increment_history(m.history, pathbuf);
             UpdateResult::Continue
         },
         Action::SetFilterText(text) => {
@@ -929,6 +965,7 @@ fn update(m: &mut Model, terminal_event: Event) -> UpdateResult {
                 m.mode = Mode::Filter;
                 m.filter_text = "".to_string();
                 m.cwd_sort = SortBy { attribute: EntryAttribute::Name, ascending: true };
+                increment_history(&mut m.history, m.cwd.display().to_string());
                 m.list_view.reset_with_items(m.sorted_entries.clone());
             }
             UpdateResult::Continue

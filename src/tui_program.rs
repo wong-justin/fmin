@@ -42,6 +42,7 @@ impl<Init, View, Update> Program<Init, View, Update> {
         View: Fn(&Model, &mut std::io::Stderr),
         // update() mutates the model bc I think it's a bit easier and more performant
         //   than creating a new Model in memory on each update
+        //   although maybe returning Model { newfield: _, ..oldmodel } would work fine
         Update: Fn(&mut Model, Event) -> UpdateResult,
     {
         let Self {init, view, update} = self;
