@@ -180,6 +180,10 @@ second step will read metadata date and size and calc display. also note im doin
 - make sure all rust functions take borrowed struct params, unless they are supposed to take ownership after the function call
 
 - try changing drawing commands to work with newer, in-progress terminal like alacritty. i suspect those terminals haven't implemented ansi codes like MoveLinesUp. so replace with more basic drawing commands, like maybe MoveTo. EDIT - note that fmin inside tmux inside alacritty, renders well, but fmin in alacritty without tmux breaks
+
+- lean into the low-friction selling point in the docs; maybe have narratives like "i want to jump to [somedir] and see what's inside" == `cd + ls`; and "i want to explore all the subdirectories, and look for big files and recently modified files" == `cd + ls --some-options`, repeated dozens of times; "i want to goto that one niche dir, but i only remember this partial name" == zoxide/history
+
+- redo screenshot, and also do demo mp4s, esp now that i have alacritty (faster, no OS border color, easy to configure perfect size)
 </details>
 
 <details>
