@@ -183,9 +183,9 @@ impl Ord for FileName {
         let b_is_dir = b.chars().last().unwrap() == '/';
 
         match (a_is_dir, b_is_dir) {
-            (true, false) => Ordering::Less,
-            (false, true) => Ordering::Greater,
-            _ => a.to_string().to_lowercase().cmp(&b.to_string().to_lowercase())
+            (true, false) => Ordering::Greater,
+            (false, true) => Ordering::Less,
+            _ => b.to_string().to_lowercase().cmp(&a.to_string().to_lowercase())
         }
     }
 }
@@ -437,12 +437,12 @@ impl SortBy {
         match &self.attribute {
             EntryAttribute::Name => {
                 if a.is_dir && !b.is_dir {
-                    return Ordering::Less;
-                }
-                if !a.is_dir && b.is_dir {
                     return Ordering::Greater;
                 }
-                return a.name.to_string().to_lowercase().cmp(&b.name.to_string().to_lowercase());
+                if !a.is_dir && b.is_dir {
+                    return Ordering::Less;
+                }
+                return b.name.to_string().to_lowercase().cmp(&a.name.to_string().to_lowercase());
             },
             EntryAttribute::Size => {
                 match (&a.size, &b.size) {
@@ -574,7 +574,8 @@ fn read_directory_contents_into_sorted(dir: &PathBuf, sort: SortBy) -> Vec<Entry
     };
 
     // TODO - reverse this if !sort.ascending
-    return name_sorted_heap.into_sorted_vec();
+    // return name_sorted_heap.into_sorted_vec();
+    return name_sorted_heap.into_sorted_vec().into_iter().rev().collect();
 }
 
 fn sort_entries(entries: &Vec<Entry>, sort: SortBy) -> Vec<Entry> {
@@ -667,7 +668,7 @@ fn init() -> Result<Model, String> {
     log::info!("---\nnew session");
 
     let cwd = std::env::current_dir().unwrap();
-    let sort = SortBy{ attribute: EntryAttribute::Name, ascending: true };
+    let sort = SortBy{ attribute: EntryAttribute::Name, ascending: false };
     let sorted_entries = read_directory_contents_into_sorted(&cwd, sort);
     // let (cols, rows) = terminal::size()?;
     let (cols, rows) = match terminal::size() {
@@ -975,7 +976,7 @@ fn update(m: &mut Model, terminal_event: Event) -> UpdateResult {
             // and updating cursor_index accordingly,
             // instead of just resetting to top
             m.cwd_sort.attribute = attribute;
-            m.cwd_sort.ascending = true;
+            m.cwd_sort.ascending = false;
             m.sorted_entries = sort_entries(&m.sorted_entries, m.cwd_sort);
             m.list_view.reset_with_items(m.sorted_entries.clone());
             UpdateResult::Continue
@@ -1182,8 +1183,8 @@ fn sort_indicator(match_attribute: EntryAttribute, current_sort: SortBy) -> &'st
     if match_attribute != current_sort.attribute { return " "; }
 
     return match current_sort.ascending {
-        true => "v",
-        false => "^",
+        true => "^",
+        false => "v",
     };
 }
 
